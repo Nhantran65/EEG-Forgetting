@@ -152,3 +152,16 @@ def test_sequential_ft_smoke_covers_both_pair_directions() -> None:
         "preinitialize_all_in_canonical_task_order"
     )
     assert config["forgetting"]["minimum_valid_headroom_above_chance"] == 0.05
+
+
+def test_main_sequential_ft_matrix_locks_three_orders_and_seeds() -> None:
+    config = load_yaml(ROOT / "configs" / "training" / "sequential_ft_v1.yaml")
+    assert config["status"] == "locked_main"
+    assert config["seeds"] == [3407, 42, 2026]
+    assert set(config["orders"]) == {"forward", "reverse", "challenging"}
+    assert config["orders"]["challenging"] == [
+        "physionet_mi",
+        "bciciv2a",
+        "sleep_edf_sc",
+    ]
+    assert config["analysis_gate"]["minimum_valid_replicates_per_direction"] == 3

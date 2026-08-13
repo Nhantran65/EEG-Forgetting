@@ -329,6 +329,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
 - [x] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
 - [ ] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints (đang chạy trong `eeg-cl-forward` trên GPU 0 và `eeg-cl-reverse` trên GPU 2).
+- [ ] Chạy main sequential FT matrix 3 order × 3 seed và stability gate trước EWC/DER++.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -364,6 +365,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Attempt microbatch-1 dùng `torch.func` vẫn tăng VRAM theo thời gian và OOM trên BCI/PhysioNet; thay bằng standard backward từng example, tắt gradient cho mọi tham số ngoài final-4 block. Công thức observed-label per-example Fisher không đổi, nhưng graph được giải phóng mỗi mẫu; toàn bộ attempt cũ tiếp tục được giữ dưới rejected results.
 - 2026-08-13: Fisher instrument gate pass: split-half cosine BCI/PhysioNet/Sleep = 0,9957/0,9655/0,9873; cross-task cosine BCI–PhysioNet/BCI–Sleep/PhysioNet–Sleep = 0,8277/0,5672/0,5871. Minimum within-task 0,9655 vượt threshold 0,90 và margin trên maximum cross-task = 0,1378 vượt threshold 0,05. Không cần escalation 2.048 mẫu.
 - 2026-08-13: Sequential FT smoke khóa hai order forward `BCI→PhysioNet→Sleep` và reverse để phủ hai chiều mọi cặp ở seed 3407. Mỗi task nhận đúng 2.500 step, optimizer reset, head được preinitialize theo canonical order để không phụ thuộc task order, head cũ freeze, final-4 backbone tiếp tục plastic. Đánh giá trên frozen test subjects sau mỗi stage; `F_rel` chỉ hợp lệ khi before-score cao hơn chance ít nhất 0,05 và không bao giờ clip.
+- 2026-08-14: Main sequential FT khóa seeds 3407/42/2026 và order thứ ba challenging `PhysioNet→BCI→Sleep`, tạo ma trận 9 run. Stability gate yêu cầu đủ ít nhất ba replicate hợp lệ cho sáu direction; ít nhất bốn direction phải có `|mean F_rel| > sample SD` và ít nhất 2/3 replicate cùng dấu. Chỉ sau gate này mới scale EWC/DER++.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.

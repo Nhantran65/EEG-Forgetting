@@ -16,7 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--order", required=True, choices=("forward", "reverse"))
+    parser.add_argument("--order", required=True)
+    parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument(
         "--config",
@@ -27,24 +28,27 @@ def parse_args() -> argparse.Namespace:
         "--cache-root", type=Path, default=PROJECT_ROOT / "data" / "processed" / "v3"
     )
     parser.add_argument(
-        "--output-root",
-        type=Path,
-        default=PROJECT_ROOT / "results" / "continual" / "sequential_ft_smoke_v1",
+        "--output-root", type=Path,
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    training_config = load_yaml(args.config)
+    output_root = args.output_root or (
+        PROJECT_ROOT / "results" / "continual" / str(training_config["id"])
+    )
     model = load_yaml(PROJECT_ROOT / "configs" / "models" / "cbramod.yaml")
     checkpoint = model["checkpoint"]
     result = run_sequential_finetuning(
         config_path=args.config,
         order_name=args.order,
+        seed=args.seed,
         cache_root=args.cache_root,
         checkpoint_path=PROJECT_ROOT / str(checkpoint["local_path"]),
         checkpoint_sha256=str(checkpoint["sha256"]),
-        output_dir=args.output_root / args.order / "seed-3407",
+        output_dir=output_root / args.order / f"seed-{args.seed}",
         device=args.device,
     )
     print(

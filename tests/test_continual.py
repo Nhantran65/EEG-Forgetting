@@ -1,6 +1,6 @@
 import pytest
 
-from eeg_forgetting.training.continual import pairwise_forgetting
+from eeg_forgetting.training.continual import aggregate_replicates, pairwise_forgetting
 
 
 def _stage(**task_values: float) -> dict[str, object]:
@@ -42,3 +42,11 @@ def test_relative_forgetting_is_flagged_not_clipped_near_chance() -> None:
     assert rows[0]["headroom"] == pytest.approx(0.04)
     assert rows[0]["relative_valid"] is False
     assert rows[0]["relative_forgetting"] is None
+
+
+def test_sequential_summary_reports_seed_spread_and_signs() -> None:
+    summary = aggregate_replicates([0.1, 0.2, -0.1])
+    assert summary["n"] == 3
+    assert summary["mean"] == pytest.approx(0.2 / 3)
+    assert summary["positive_fraction"] == pytest.approx(2 / 3)
+    assert summary["negative_fraction"] == pytest.approx(1 / 3)

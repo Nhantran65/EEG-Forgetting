@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import statistics
 from collections import deque
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -28,6 +29,21 @@ from .pilot import (
 
 
 CANONICAL_TASKS = ("bciciv2a", "physionet_mi", "sleep_edf_sc")
+
+
+def aggregate_replicates(values: Sequence[float]) -> dict[str, float | int]:
+    if not values:
+        raise DatasetProtocolError("cannot aggregate zero continual-learning replicates")
+    values = [float(value) for value in values]
+    return {
+        "n": len(values),
+        "mean": statistics.mean(values),
+        "sample_sd": statistics.stdev(values) if len(values) > 1 else 0.0,
+        "minimum": min(values),
+        "maximum": max(values),
+        "positive_fraction": sum(value > 0 for value in values) / len(values),
+        "negative_fraction": sum(value < 0 for value in values) / len(values),
+    }
 
 
 class MultiHeadCBraMod(nn.Module):
@@ -177,6 +193,7 @@ def run_sequential_finetuning(
     *,
     config_path: str | Path,
     order_name: str,
+    seed: int | None = None,
     cache_root: str | Path,
     checkpoint_path: str | Path,
     checkpoint_sha256: str,
@@ -187,7 +204,7 @@ def run_sequential_finetuning(
 
     config_path = Path(config_path)
     config = load_yaml(config_path)
-    if config["status"] != "locked_smoke" or order_name not in config["orders"]:
+    if config["status"] not in {"locked_smoke", "locked_main"} or order_name not in config["orders"]:
         raise DatasetProtocolError("unknown sequential FT smoke order")
     order = tuple(config["orders"][order_name])
     if set(order) != set(CANONICAL_TASKS):
@@ -196,7 +213,12 @@ def run_sequential_finetuning(
     result_path = output_dir / "result.json"
     if result_path.exists():
         raise DatasetProtocolError(f"refusing to overwrite continual result {result_path}")
-    seed = int(config["seed"])
+    declared_seeds = tuple(
+        int(value) for value in config.get("seeds", [config.get("seed")])
+    )
+    seed = declared_seeds[0] if seed is None else int(seed)
+    if seed not in declared_seeds:
+        raise DatasetProtocolError(f"seed {seed} is not declared by the sequential config")
     set_determinism(seed)
     device = torch.device(device)
     torch.cuda.set_device(device)

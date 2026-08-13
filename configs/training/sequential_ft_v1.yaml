@@ -1,0 +1,50 @@
+schema_version: 1
+id: sequential_ft_v1
+status: locked_main
+method: sequential_finetuning
+manifest_version: v3
+seeds: [3407, 42, 2026]
+canonical_tasks: [bciciv2a, physionet_mi, sleep_edf_sc]
+orders:
+  forward: [bciciv2a, physionet_mi, sleep_edf_sc]
+  reverse: [sleep_edf_sc, physionet_mi, bciciv2a]
+  challenging: [physionet_mi, bciciv2a, sleep_edf_sc]
+model:
+  head: flatten_mlp
+  head_initialization: preinitialize_all_in_canonical_task_order
+  plastic_final_encoder_blocks: 4
+  frozen_backbone_mode: eval
+training:
+  train_split: train
+  evaluation_split: test
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  optimizer_reset_each_task: true
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+evaluation:
+  primary: mean_subject_balanced_accuracy
+  supporting: [balanced_accuracy, accuracy, macro_f1, cohen_kappa]
+  save_predictions: true
+  evaluate_seen_tasks_after_each_stage: true
+forgetting:
+  raw: before_minus_after
+  relative: raw_divided_by_before_minus_chance
+  minimum_valid_headroom_above_chance: 0.05
+  invalid_action: retain_raw_and_flag_relative_null_without_clipping
+analysis_gate:
+  minimum_valid_replicates_per_direction: 3
+  signal_definition: absolute_mean_relative_forgetting_exceeds_sample_sd
+  minimum_signal_directions: 4
+  minimum_same_sign_fraction_per_direction: 0.6666666666666666
+recovery:
+  checkpoint_after_each_task: true
+  resume_only_from_digest_verified_complete_stage: true
+purpose: main_sequential_ft_seed_and_order_stability_gate_before_ewc_derpp
