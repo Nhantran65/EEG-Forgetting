@@ -1,0 +1,39 @@
+schema_version: 1
+id: cbramod_depth_v2
+status: invalid_frozen_backbone_dropout_confounded
+datasets: [bciciv2a, physionet_mi, sleep_edf_sc]
+manifest_version: v3
+seed: 3407
+head: flatten_mlp
+depths: [0, 1, 2, 4, 8]
+depth_zero_role: frozen_backbone_nonlinear_head_control
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 2500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+precision: float32
+selection:
+  candidate_depths: [1, 2, 4, 8]
+  metric: mean_subject_balanced_accuracy
+  normalize_against_chance: true
+  rule: smallest_depth_at_least_95_percent_of_best_mean_normalized_validation_metric
+  threshold: 0.95
+checkpoint_policy:
+  depth_selection: best_validation
+  budget_matched_future_runs: exact_step_2500
+notes:
+  - v1 is invalid for selection because mean pooling stayed near chance on BCI.
+  - v2 uses the locked upstream all-patch MLP family and the full budget horizon.
+  - The v1 mean-pool run is only a negative control; v2 depth zero is a nonlinear-head control.
+  - Superseded by v3 because model.train() enabled dropout inside frozen upstream blocks.

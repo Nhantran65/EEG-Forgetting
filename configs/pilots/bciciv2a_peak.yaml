@@ -1,0 +1,29 @@
+schema_version: 1
+id: bciciv2a_peak_v1
+status: invalid_frozen_backbone_dropout_confounded
+dataset: bciciv2a
+manifest_version: v3
+seed: 3407
+depth: 2
+head: flatten_mlp
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 2500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+purpose: locate_validation_peak_and_test_whether_the_500_step_head_pilot_was_undertrained
+decision_rule:
+  accept_head_if_best_subject_ba_at_least: 0.35
+  do_not_select_main_depth_from_this_single_task_run: true
+notes:
+  - Superseded by the corrected depth-v3 BCI curve with frozen upstream blocks in eval mode.

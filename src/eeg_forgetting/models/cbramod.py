@@ -202,20 +202,58 @@ class CBraMod(nn.Module):
 
 
 class CBraModTaskModel(nn.Module):
-    """Diagnostic mean-pool head; the main experiment head is not locked yet."""
+    """CBraMod plus an explicitly named downstream classification head."""
 
-    def __init__(self, backbone: CBraMod, num_classes: int):
+    def __init__(
+        self,
+        backbone: CBraMod,
+        num_classes: int,
+        *,
+        head: str = "mean_pool_linear",
+        channels: int | None = None,
+        patches: int | None = None,
+        dropout: float = 0.1,
+    ):
         super().__init__()
         if num_classes <= 1:
             raise DatasetProtocolError("classification head needs at least two classes")
         self.backbone = backbone
-        self.classifier = nn.Linear(backbone.config.d_model, num_classes)
+        self.head_name = head
+        if head == "mean_pool_linear":
+            self.classifier = nn.Linear(backbone.config.d_model, num_classes)
+        elif head == "flatten_linear":
+            if channels is None or patches is None:
+                raise DatasetProtocolError("flatten_linear requires channels and patches")
+            self.classifier = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(channels * patches * backbone.config.d_model, num_classes),
+            )
+        elif head == "flatten_mlp":
+            if channels is None or patches is None:
+                raise DatasetProtocolError("flatten_mlp requires channels and patches")
+            self.classifier = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(channels * patches * backbone.config.d_model, 4 * 200),
+                nn.ELU(),
+                nn.Dropout(dropout),
+                nn.Linear(4 * 200, 200),
+                nn.ELU(),
+                nn.Dropout(dropout),
+                nn.Linear(200, num_classes),
+            )
+        else:
+            raise DatasetProtocolError(f"unknown CBraMod task head {head!r}")
 
     def forward(
         self, x: Tensor, *, return_features: bool = False
     ) -> Tensor | tuple[Tensor, Tensor]:
         features = self.backbone.forward_features(x)
-        logits = self.classifier(features.mean(dim=(1, 2)))
+        classifier_input = (
+            features.mean(dim=(1, 2))
+            if self.head_name == "mean_pool_linear"
+            else features
+        )
+        logits = self.classifier(classifier_input)
         return (logits, features) if return_features else logits
 
 

@@ -1,8 +1,8 @@
 # CBraMod Integration Contract
 
-This document defines the model/code identity and the currently validated
-boundary between frozen EEG manifests and CBraMod. It does not yet select the
-main experiment classifier head or plasticity depth.
+This document defines the model/code identity and the validated boundary
+between frozen EEG manifests and CBraMod. The main classifier family and
+plasticity depth are locked.
 
 ## Pinned identity
 
@@ -40,11 +40,24 @@ derives channel and patch dimensions at runtime. `set_trainable_depth(N)`
 freezes patch embedding and all but the last `N` encoder blocks, matching the
 predeclared 1/2/4/8-block sweep.
 
-`CBraModTaskModel` currently uses mean pooling followed by a linear head only
-for integration proof and the prospective linear-probe diagnostic. It is not
-authority for the main single-task/continual-learning classifier. The main head
-must be selected before baseline training because the upstream all-patch heads
-hard-code dataset shape and produce unequal task-specific parameter counts.
+The main task head is the upstream all-patch family: flatten all channel-patch
+representations, then `Linear(C*P*200, 800) -> ELU -> Dropout -> Linear(800,
+200) -> ELU -> Dropout -> Linear(200, classes)`. Its task-specific parameter
+count is reported separately from shared-backbone memory.
+
+The Week-1 linear probe also sees every channel-patch representation but has
+only one linear output layer. The earlier mean-pool linear run is retained as a
+negative control because averaging first discarded the structure used by the
+main head. It is not used for the fine-tune-versus-probe gate.
+
+When only the final `N` blocks are plastic, the patch embedding and preceding
+frozen encoder blocks remain in eval mode. This matters because they contain
+dropout: enabling training mode in frozen blocks made the representation
+stochastic and strongly biased the first depth sweep against shallow depths.
+That sweep is explicitly invalidated in config; depth v3 is the first eligible
+selection run. Depth v3 selected the final four encoder blocks: its normalized
+mean validation BA was 0.4335 versus the best 0.4473 at depth 8, clearing the
+predeclared 95% threshold of 0.4249. See decision 0001 for per-task evidence.
 
 ## Executable proof
 

@@ -32,6 +32,25 @@ def test_trainable_depth_unfreezes_only_last_encoder_blocks() -> None:
     assert not any(parameter.requires_grad for parameter in backbone.proj_out.parameters())
 
 
+def test_flatten_mlp_head_preserves_patch_structure() -> None:
+    backbone = CBraMod(CBraModConfig(n_layer=1))
+    model = CBraModTaskModel(
+        backbone, 4, head="flatten_mlp", channels=22, patches=4
+    ).eval()
+    with torch.no_grad():
+        assert model(torch.randn(2, 22, 4, 200)).shape == (2, 4)
+
+
+def test_flatten_linear_probe_preserves_patch_structure() -> None:
+    backbone = CBraMod(CBraModConfig(n_layer=1))
+    model = CBraModTaskModel(
+        backbone, 4, head="flatten_linear", channels=22, patches=4
+    ).eval()
+    with torch.no_grad():
+        assert model(torch.randn(2, 22, 4, 200)).shape == (2, 4)
+    assert model.classifier[1].in_features == 22 * 4 * 200
+
+
 def test_cbramod_rejects_wrong_patch_size() -> None:
     backbone = CBraMod(CBraModConfig(n_layer=1))
     with pytest.raises(DatasetProtocolError, match="200 points"):

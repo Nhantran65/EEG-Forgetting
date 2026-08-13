@@ -75,4 +75,20 @@ def test_cbramod_code_and_checkpoint_identity_are_pinned() -> None:
         "0792cb808c14e6b7a2bb2ce1dff379bc47bc54c49a779825bdfeb33bf8157178"
     )
     assert config["checkpoint"]["load_mode"] == "torch_weights_only_strict"
-    assert config["integration_probe"]["main_experiment_head_locked"] is False
+    assert config["integration_probe"]["main_experiment_head_locked"] is True
+    assert config["main_task_head"]["name"] == "flatten_mlp"
+    assert config["plasticity"]["selected_final_encoder_blocks"] == 4
+    assert config["plasticity"]["frozen_backbone_mode"] == "eval"
+
+
+def test_depth_v3_and_linear_probe_controls_are_explicit() -> None:
+    pilots = ROOT / "configs" / "pilots"
+    probe = load_yaml(pilots / "cbramod_linear_probe.yaml")
+    sweep = load_yaml(pilots / "cbramod_depth_v3.yaml")
+    invalid = load_yaml(pilots / "cbramod_depth_v2.yaml")
+
+    assert probe["head"] == "flatten_linear"
+    assert probe["depths"] == [0]
+    assert sweep["frozen_backbone_mode"] == "eval"
+    assert sweep["selection"]["candidate_depths"] == [1, 2, 4, 8]
+    assert invalid["status"] == "invalid_frozen_backbone_dropout_confounded"

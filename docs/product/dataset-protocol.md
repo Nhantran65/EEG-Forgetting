@@ -15,6 +15,9 @@ readable values live in `configs/`.
 - Run a separate converged, early-stopped single-task baseline for Week-1
   validation and task performance ceilings. Fisher signatures use the
   budget-matched checkpoints.
+- The frozen-backbone probe is `flatten(all channel-patch features) -> Linear`.
+  A mean-pooled probe is only a negative control. During partial fine-tuning,
+  frozen blocks remain in eval mode and only plastic blocks enable dropout.
 
 ## BCI Competition IV-2a
 

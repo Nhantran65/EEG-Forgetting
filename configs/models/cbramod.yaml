@@ -24,5 +24,22 @@ architecture:
   variable_patch_count: true
 integration_probe:
   head: mean_pool_linear
-  purpose: forward_backward_and_linear_probe_only
-  main_experiment_head_locked: false
+  purpose: forward_backward_and_negative_control_only
+  main_experiment_head_locked: true
+  pilot_outcome: rejected_for_depth_selection_after_bci_near_chance
+main_task_head:
+  name: flatten_mlp
+  family: official_cbramod_all_patch_reps
+  hidden_dimensions: [800, 200]
+  activation: ELU
+  dropout: 0.1
+  task_specific_output_classes: true
+  locked_for_depth_v3: true
+plasticity:
+  selected_final_encoder_blocks: 4
+  frozen_backbone_mode: eval
+  selection_pilot: cbramod_depth_v3
+  selection_rule: smallest_depth_at_least_95_percent_of_best_mean_normalized_validation_metric
+  best_candidate_mean_normalized_validation_ba: 0.44730464222363486
+  threshold: 0.4249394101124531
+  selected_mean_normalized_validation_ba: 0.4335414684744341

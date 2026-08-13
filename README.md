@@ -54,6 +54,18 @@ loader. To materialize a later version from a new audited snapshot, pass an
 explicit new output directory to `scripts/build_manifests.py`; the builder
 refuses to overwrite an existing set.
 
+The training cache is derived only through that manifest-backed boundary and
+is resumable per recording/session:
+
+```bash
+uv run python scripts/build_processed_cache.py \
+  --datasets bciciv2a physionet_mi sleep_edf_sc \
+  --splits train validation --workers 8
+```
+
+The audited v3 cache contains 2,678/982 BCI trials, 6,300/1,620 PhysioNet
+trials, and 118,662/39,580 Sleep epochs for train/validation respectively.
+
 ## CBraMod integration
 
 The model adapter is pinned to official CBraMod code commit
@@ -69,3 +81,21 @@ The checkpoint lives under ignored `checkpoints/`; its revision, byte count and
 SHA-256 are locked in `configs/models/cbramod.yaml`. The current project lock
 uses the PyTorch CUDA 13.0 wheel. The smoke script requires an environment that
 exposes NVIDIA devices; unit tests remain CPU-compatible.
+
+Pilot outputs are create-only under ignored `results/pilots/`. The fair frozen
+probe uses every channel-patch feature followed by one linear layer. The depth
+sweep uses the locked all-patch MLP head and keeps frozen CBraMod blocks in eval
+mode so their dropout cannot confound the number of plastic blocks:
+
+```bash
+uv run python scripts/run_cbramod_depth_pilot.py \
+  --dataset bciciv2a --depth 0 \
+  --config configs/pilots/cbramod_linear_probe.yaml \
+  --output-root results/pilots/cbramod_linear_probe_v1
+uv run python scripts/run_cbramod_depth_matrix.py --devices 0 1 2 3
+uv run python scripts/summarize_cbramod_depth_pilot.py
+```
+
+Depth v3 selected the final four encoder blocks by the predeclared 95% rule;
+the evidence and rejected pilot history are recorded in
+`docs/decisions/0001-lock-cbramod-head-and-depth.md`.

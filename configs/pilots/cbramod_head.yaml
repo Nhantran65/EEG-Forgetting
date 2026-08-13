@@ -1,0 +1,32 @@
+schema_version: 1
+id: cbramod_head_v1
+status: superseded_by_corrected_depth_v3
+dataset: bciciv2a
+manifest_version: v3
+seed: 3407
+depth: 2
+heads: [mean_pool_linear, flatten_mlp]
+reference_result: results/pilots/cbramod_depth_v1/bciciv2a/depth-2/seed-3407/result.json
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+selection:
+  metric: mean_subject_balanced_accuracy
+  minimum_acceptable_ba: 0.35
+  rule: choose_flatten_mlp_only_if_it_clears_minimum_and_beats_mean_pool
+notes:
+  - flatten_mlp matches the official CBraMod all_patch_reps classifier family.
+  - A failed threshold pauses depth selection instead of promoting a weak head.
+  - The run used the old frozen-block train mode; only the head family, later validated by v3, was retained.

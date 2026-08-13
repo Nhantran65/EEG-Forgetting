@@ -1,0 +1,31 @@
+schema_version: 1
+id: cbramod_linear_probe_v1
+status: locked_pilot
+datasets: [bciciv2a, physionet_mi, sleep_edf_sc]
+manifest_version: v3
+seed: 3407
+head: flatten_linear
+depths: [0]
+depth_zero_role: frozen_backbone_all_patch_linear_probe
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 2500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+precision: float32
+selection:
+  metric: mean_subject_balanced_accuracy
+  checkpoint: best_validation
+notes:
+  - The linear layer sees every channel-patch representation without nonlinear hidden layers.
+  - The rejected mean-pool linear head remains a negative control, not the Week-1 linear-probe gate.

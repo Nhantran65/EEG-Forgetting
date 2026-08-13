@@ -1,0 +1,34 @@
+schema_version: 1
+id: cbramod_depth_v1
+status: rejected_mean_pool_head_pilot
+datasets: [bciciv2a, physionet_mi, sleep_edf_sc]
+manifest_version: v3
+seed: 3407
+head: mean_pool_linear
+depths: [0, 1, 2, 4, 8]
+depth_zero_role: mean_pool_negative_control
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+precision: float32
+selection:
+  metric: mean_subject_balanced_accuracy
+  normalize_against_chance: true
+  rule: smallest_depth_at_least_95_percent_of_best_mean_normalized_validation_metric
+  threshold: 0.95
+notes:
+  - Pilot settings inherit optimizer defaults from pinned upstream CBraMod.
+  - This pilot does not replace the 2500-step budget-matched main runs.
+  - BCI evidence showed near-chance validation and invalidated this head for depth selection.
