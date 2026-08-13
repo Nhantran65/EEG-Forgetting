@@ -139,3 +139,16 @@ def test_fisher_instrument_uses_exact_disjoint_split_halves() -> None:
     assert estimator["gradient_microbatch_size"] == 1
     assert config["normalization"]["primary"] == "l2_within_encoder_layer"
     assert config["instrument_gate"]["if_failed"].startswith("double_sample_count")
+
+
+def test_sequential_ft_smoke_covers_both_pair_directions() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "pilots" / "sequential_ft_smoke_v1.yaml"
+    )
+    assert config["orders"]["reverse"] == list(reversed(config["orders"]["forward"]))
+    assert config["training"]["optimizer_steps_per_task"] == 2500
+    assert config["training"]["evaluation_split"] == "test"
+    assert config["model"]["head_initialization"] == (
+        "preinitialize_all_in_canonical_task_order"
+    )
+    assert config["forgetting"]["minimum_valid_headroom_above_chance"] == 0.05
