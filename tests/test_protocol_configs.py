@@ -125,3 +125,15 @@ def test_physionet_upstream_reproduction_contract_is_separate_from_manifest() ->
     assert config["input"]["channels"] == 64
     assert config["training"]["epochs"] == 50
     assert config["selection"]["metric"] == "validation_cohen_kappa"
+
+
+def test_fisher_instrument_uses_exact_disjoint_split_halves() -> None:
+    config = load_yaml(ROOT / "configs" / "pilots" / "fisher_instrument_v1.yaml")
+    estimator = config["estimator"]
+    assert config["parameters"]["scope"] == "shared_plastic_backbone_only"
+    assert config["parameters"]["exclude_task_head"] is True
+    assert estimator["gradient_unit"] == "individual_example"
+    assert estimator["model_mode"] == "eval"
+    assert estimator["sample_count"] == 2 * estimator["split_half_samples"] == 1024
+    assert config["normalization"]["primary"] == "l2_within_encoder_layer"
+    assert config["instrument_gate"]["if_failed"].startswith("double_sample_count")

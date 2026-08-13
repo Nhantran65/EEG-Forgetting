@@ -167,6 +167,7 @@ Metric chính chuẩn hóa theo headroom:
 
 - Train single-task models độc lập từ cùng pretrained CBraMod, cùng selected depth và protocol.
 - Tính diagonal empirical Fisher importance trên shared-backbone parameters; không đưa task head vào overlap.
+- Instrument pilot dùng exact per-example gradient của observed-label NLL trên 1.024 mẫu train lấy đều không hoàn lại từ natural distribution. Chỉ bốn encoder block plastic được đo; model ở eval mode. Hai nửa 512 mẫu rời nhau phải đạt cosine ít nhất 0,90 và cao hơn cross-task cosine lớn nhất ít nhất 0,05; nếu fail thì tăng 2.048 mẫu trước khi scale CL.
 - Normalize importance theo layer trước khi ghép để layer lớn không tự động chi phối.
 - Primary overlap: cosine similarity giữa hai Fisher-importance vector.
 - Sensitivity: top-k Jaccard và layer-wise overlap; `k` được predeclare từ validation, không chọn sau khi thấy correlation.
@@ -325,7 +326,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn tất depth-v3 sweep và khóa final-4-block plasticity depth.
 - [x] Chạy exact-2.500-step single-task baseline depth 4 và lưu riêng best/final checkpoint cho ba task.
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
-- [ ] Chạy converged single-task baseline với early stopping đã khóa trên ba task (đang chạy trong `eeg-conv-bci`, `eeg-conv-phys`, `eeg-conv-sleep`; log dưới `results/single_task/converged_v1/`).
+- [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
+- [ ] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -355,6 +357,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Audit code upstream xác nhận PhysioNet external reproduction phải dùng 64 channel + CAR + high-pass 0,3 Hz + notch 60 Hz + 50 epoch full-backbone, không phải main harmonized 22-channel. Cache reproduction được tách tên/root để không thể dùng nhầm.
 - 2026-08-13: One-seed upstream PhysioNet reproduction (`seed=3407`, PyTorch 2.13.0+cu130) chọn epoch 33 theo validation kappa và đạt test BA 0,6229, kappa 0,4972, weighted-F1 0,6241. Các số này nằm trong 3 SD của mean 5-seed công bố 0,6417±0,0091 / 0,5222±0,0169 / 0,6427±0,0100; đây là external pipeline gate, không thay thế reproduction đủ 5 seed và không đi vào main result.
 - 2026-08-13: Converged baseline khóa validation mỗi 100 step, patience 10 validation, `min_delta=0`, restore-best và hard cap 5.000 step. Patience 5 bị loại vì retrospective simulation trên curve đã khóa sẽ dừng Sleep ở step 1.600 trước peak quan sát tại step 2.100.
+- 2026-08-13: Converged runs đạt best subject BA 0,5516@300 cho BCI và 0,4712@300 cho PhysioNet, cùng early-stop ở step 1.300. Sleep đạt 0,6984@4.200 và kết thúc bởi hard cap 5.000 sau tám validation liên tiếp dưới best; checkpoint được giữ nhưng phải ghi là maximum-step capped, không claim đã kích hoạt early convergence.
+- 2026-08-13: Fisher instrument v1 dùng observed-label exact per-example empirical Fisher, uniform sample không hoàn lại từ natural train distribution, 1.024 mẫu chia hai half 512 rời nhau, model eval và chỉ final-4 plastic backbone blocks. Primary layer normalization là L2 trong từng encoder layer; top-k sensitivity chưa kích hoạt.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -384,7 +388,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 62 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, multiclass reproduction metrics, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 68 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
@@ -394,4 +398,4 @@ Observed implementation proof on 2026-08-13:
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step baselines và one-off PhysioNet reproduction đã hoàn thành. Ba converged baselines đang chạy độc lập trong `tmux`; sau khi hoàn tất sẽ tạo Fisher signatures. TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines và one-off PhysioNet reproduction đã hoàn thành. Việc tiếp theo là pass Fisher instrument gate trước khi scale continual-learning. TUEV vẫn cần xác nhận trước deadline truy cập.
