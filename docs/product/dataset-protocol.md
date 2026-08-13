@@ -55,7 +55,14 @@ The frozen split contains 48/15/15 train/validation/test subjects. It uses seed
 `20260813` and strata formed by sex crossed with four age bands: 25–39, 40–64,
 65–79, and 80+. The resulting recording counts are 94/30/29 because three
 subjects have only one available night. Exact assignments and source checksums
-are in `manifests/v1/`.
+are in the active `manifests/v3/` set.
+
+All training/evaluation data access must go through `FrozenManifestSet` and
+`ManifestEEGLoader`. The manifest-backed boundary verifies the manifest and
+config digests, source existence and byte sizes, split assignment, and emitted
+sample shape before returning data. Full raw-source SHA-256 verification is a
+separate pre-run audit so routine dataloader startup does not hash the 9.7 GB
+snapshot repeatedly.
 
 ## TUEV
 

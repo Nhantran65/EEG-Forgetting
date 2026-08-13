@@ -41,12 +41,15 @@ locked protocol:
 uv run python scripts/download_public_datasets.py --workers 16
 uv run python scripts/audit_downloaded_data.py
 uv run python scripts/audit_manifests.py --verify-sources
+uv run python scripts/smoke_test_real_preprocessing.py
 ```
 
 Raw files live under `data/raw/` and are ignored by Git. The current audited
 snapshot contains 18 BCI IV-2a GDF files plus labels, 654 PhysioNet imagery EDF
 files, and 153 paired Sleep Cassette recordings.
 
-The frozen v1 split manifests are in `manifests/v1/`. To materialize a later
-manifest version from a new audited snapshot, pass a new output directory to
-`scripts/build_manifests.py`; the builder refuses to overwrite an existing set.
+The active frozen split manifests are in `manifests/v3/`. They also freeze the
+channel registry and shared preprocessing config used by the manifest-backed
+loader. To materialize a later version from a new audited snapshot, pass an
+explicit new output directory to `scripts/build_manifests.py`; the builder
+refuses to overwrite an existing set.

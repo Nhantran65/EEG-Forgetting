@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--manifest-set",
         type=Path,
-        default=PROJECT_ROOT / "manifests" / "v1" / "manifest-set.json",
+        default=PROJECT_ROOT / "manifests" / "v3" / "manifest-set.json",
     )
     parser.add_argument(
         "--verify-sources",
@@ -62,7 +62,11 @@ def main() -> None:
         index = json.load(handle)
 
     for config_name, expected in index["configs"].items():
-        path = PROJECT_ROOT / "configs" / "datasets" / config_name
+        path = (
+            resolve(config_name)
+            if "/" in config_name
+            else PROJECT_ROOT / "configs" / "datasets" / config_name
+        )
         observed = sha256_file(path)
         if observed != expected:
             raise DatasetProtocolError(f"config changed after freeze: {path}")
@@ -116,7 +120,9 @@ def main() -> None:
         raise DatasetProtocolError("Sleep-EDF must contain 153 unique recordings")
 
     suffix = " including raw source checksums" if args.verify_sources else ""
-    print(f"Immutable manifest v1 audit passed{suffix}.")
+    print(
+        f"Immutable manifest {index['manifest_version']} audit passed{suffix}."
+    )
     print("BCI IV-2a: 5/2/2 subjects")
     print("PhysioNet-MI main: 70/18/17 subjects + 4 explicit exclusions")
     print("Sleep-EDF: 48/15/15 subjects; 94/30/29 recordings")

@@ -1,0 +1,116 @@
+{
+  "configs": {
+    "configs/channels.yaml": "c499dc51e19f78702ab9b690217a50d7f971d437ac750dc6f5f97f7542694dc2",
+    "configs/common.yaml": "8d6b27817b6e45fcac4fe709f619e03883132e85fc814cac2ea0a4294a7c67a0",
+    "configs/datasets/bciciv2a.yaml": "ccec0aad965bd33083e7ac2d4ae2fc2c708dbe623f76974e722a47a19c3935f0",
+    "configs/datasets/physionet_mi.yaml": "bcea6e807998dace3d7eed2a5cca36ab10257a8b7746b20e3b70766a4de1f265",
+    "configs/datasets/sleep_edf.yaml": "e927792f9243589d5119a9a2aa74236f298fd5ed0b03e531d65b3bbdee83c849",
+    "configs/datasets/tuev.yaml": "274587dd3b3ab7d79b15ced47970191d175963d12949dc02fe31e78df6c2709a",
+    "configs/datasets/vep.yaml": "33b979dde9e71e8a981d665fd7d6205d183161cab573f4db8d56fa537a5d9846"
+  },
+  "created_at_utc": "2026-08-13T09:15:48.743631+00:00",
+  "manifest_version": "v3",
+  "manifests": {
+    "bciciv2a": {
+      "path": "manifests/v3/bciciv2a.jsonl",
+      "rows": 9,
+      "sha256": "7f5d94d459ca58019d9beafe54c0e882ffe9b176491237c86848b77e460ca9a4",
+      "summary": {
+        "rows": 9,
+        "subjects": {
+          "test": 2,
+          "train": 5,
+          "validation": 2
+        }
+      }
+    },
+    "physionet_mi": {
+      "path": "manifests/v3/physionet_mi.jsonl",
+      "rows": 109,
+      "sha256": "f149b6c7af7865a1a786179d5590bfbf769e416081e3c7fe6e6b47c1b0961077",
+      "summary": {
+        "reproduction_subjects": {
+          "test": 20,
+          "train": 70,
+          "validation": 19
+        },
+        "rows": 109,
+        "subjects": {
+          "excluded": 4,
+          "test": 17,
+          "train": 70,
+          "validation": 18
+        }
+      }
+    },
+    "sleep_edf_sc": {
+      "path": "manifests/v3/sleep_edf_sc.jsonl",
+      "rows": 153,
+      "sha256": "3b47f9000014d69aa78b2ebf812696b64dad5dd8a17a5a822941d63b2216f129",
+      "summary": {
+        "rows": 153,
+        "split_distribution": {
+          "test": {
+            "age_bands": {
+              "middle": 4,
+              "older": 4,
+              "oldest": 3,
+              "young": 4
+            },
+            "age_years": {
+              "max": 92,
+              "mean": 59.07,
+              "min": 26
+            },
+            "recordings": 29,
+            "sex": {
+              "female": 8,
+              "male": 7
+            },
+            "subjects": 15
+          },
+          "train": {
+            "age_bands": {
+              "middle": 14,
+              "older": 12,
+              "oldest": 10,
+              "young": 12
+            },
+            "age_years": {
+              "max": 97,
+              "mean": 58.85,
+              "min": 25
+            },
+            "recordings": 94,
+            "sex": {
+              "female": 25,
+              "male": 23
+            },
+            "subjects": 48
+          },
+          "validation": {
+            "age_bands": {
+              "middle": 4,
+              "older": 4,
+              "oldest": 3,
+              "young": 4
+            },
+            "age_years": {
+              "max": 101,
+              "mean": 58.33,
+              "min": 25
+            },
+            "recordings": 30,
+            "sex": {
+              "female": 8,
+              "male": 7
+            },
+            "subjects": 15
+          }
+        }
+      }
+    }
+  },
+  "schema_version": 1,
+  "sleep_split_seed": 20260813
+}

@@ -30,3 +30,21 @@ def test_sleep_edf_prefixed_bipolar_names_resolve() -> None:
     assert registry.indices(
         ["EEG Fpz-Cz", "EEG Pz-Oz"], "sleep_edf_bipolar"
     ) == (0, 1)
+
+
+def test_mne_bci_gdf_placeholder_names_resolve_to_official_order() -> None:
+    registry = ChannelRegistry.from_yaml(ROOT / "configs/channels.yaml")
+    source = [
+        "EEG-Fz",
+        *[f"EEG-{index}" for index in range(6)],
+        "EEG-C3",
+        "EEG-6",
+        "EEG-Cz",
+        "EEG-7",
+        "EEG-C4",
+        *[f"EEG-{index}" for index in range(8, 15)],
+        "EEG-Pz",
+        "EEG-15",
+        "EEG-16",
+    ]
+    assert registry.indices(source, "bciciv2a_22") == tuple(range(22))

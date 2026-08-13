@@ -31,7 +31,12 @@ SCHEMA_VERSION = 1
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-root", type=Path, default=PROJECT_ROOT / "data" / "raw")
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "manifests" / "v1")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="New version directory, for example manifests/v4; existing files are never replaced.",
+    )
     return parser.parse_args()
 
 
@@ -290,12 +295,16 @@ def main() -> None:
     built = {name: builder(args.raw_root) for name, builder in builders.items()}
     manifest_index: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
-        "manifest_version": "v1",
+        "manifest_version": args.output.name,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "sleep_split_seed": 20260813,
         "configs": {
-            path.name: sha256_file(path)
-            for path in sorted((PROJECT_ROOT / "configs" / "datasets").glob("*.yaml"))
+            relative(path): sha256_file(path)
+            for path in (
+                PROJECT_ROOT / "configs" / "channels.yaml",
+                PROJECT_ROOT / "configs" / "common.yaml",
+                *sorted((PROJECT_ROOT / "configs" / "datasets").glob("*.yaml")),
+            )
         },
         "manifests": {},
     }
