@@ -328,7 +328,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
 - [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
 - [x] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
-- [ ] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints.
+- [ ] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints (đang chạy trong `eeg-cl-forward` trên GPU 0 và `eeg-cl-reverse` trên GPU 2).
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -393,14 +393,15 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 68 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 71 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance rules, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
 - Real preprocessing smoke through manifest v3 passed on A01E (281 non-artifact trials, 4 classes, `22x4x200`), S001R04 (15 trials, `22x4x200`), and SC00 night 1 (841 epochs, 5 stages, `2x30x200`); every signal was finite `float32` in CBraMod units.
 - CBraMod adapter strict-loaded all 211 checkpoint tensors (4,924,000 parameters) and matched pinned upstream output exactly (`max_abs_diff=0.0`). On one L40S with PyTorch 2.13.0+cu130, real batch-size-2 forward/loss/backward passed for BCI, PhysioNet and Sleep with finite non-zero last-block gradients.
 - PhysioNet reproduction cache matched the pinned upstream preprocessing exactly on S001R04 (`15x64x4x200`, `max_abs_diff=0.0`), contained the same 9.837 examples across 70/19/20 subjects, and reproduced the upstream classifier initialization bit-for-bit. The completed 50-epoch run selected epoch 33 and produced test BA 0,6229, kappa 0,4972 and weighted-F1 0,6241; checkpoint/config digests re-verified after the run.
+- Frozen test caches were materialized and bound to manifest v3: BCI 1.036 samples/2 subjects, PhysioNet 1.530/17 and Sleep 37.227/15. Full source-checksum manifest audit passed immediately before launching sequential FT.
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines và one-off PhysioNet reproduction đã hoàn thành. Việc tiếp theo là pass Fisher instrument gate trước khi scale continual-learning. TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction và Fisher instrument gate đã hoàn thành. Forward/reverse sequential FT smoke đang chạy trên GPU 0/2. TUEV vẫn cần xác nhận trước deadline truy cập.
