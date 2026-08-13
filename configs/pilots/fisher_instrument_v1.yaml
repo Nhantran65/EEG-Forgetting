@@ -13,6 +13,7 @@ estimator:
   name: diagonal_empirical_fisher
   target: observed_label_negative_log_likelihood
   gradient_unit: individual_example
+  implementation: standard_backward_per_example
   model_mode: eval
   sample_count: 1024
   sampling: uniform_without_replacement_from_training_manifest

@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import Tensor, nn
-from torch.func import functional_call, grad, vmap
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, Subset
 
@@ -57,18 +56,6 @@ def selected_plastic_parameters(model: nn.Module, *, final_blocks: int) -> Fishe
     return selected
 
 
-def _example_negative_log_likelihood(
-    parameters: Mapping[str, Tensor],
-    model: nn.Module,
-    signal: Tensor,
-    label: Tensor,
-) -> Tensor:
-    logits = functional_call(
-        model, parameters, (signal.unsqueeze(0),), strict=False
-    )
-    return F.cross_entropy(logits, label.unsqueeze(0))
-
-
 def diagonal_empirical_fisher(
     model: nn.Module,
     dataset: Dataset,
@@ -86,13 +73,11 @@ def diagonal_empirical_fisher(
         raise DatasetProtocolError("Fisher cannot use an empty sample")
     device = torch.device(device)
     model.eval().to(device)
+    for parameter in model.parameters():
+        parameter.requires_grad = False
     parameters = selected_plastic_parameters(model, final_blocks=final_blocks)
-    gradient_one = grad(_example_negative_log_likelihood)
-    gradient_batch = vmap(
-        gradient_one,
-        in_dims=(None, None, 0, 0),
-        randomness="error",
-    )
+    for parameter in parameters.values():
+        parameter.requires_grad = True
     accumulator = OrderedDict(
         (name, torch.zeros_like(parameter, dtype=torch.float64, device=device))
         for name, parameter in parameters.items()
@@ -108,12 +93,19 @@ def diagonal_empirical_fisher(
     for signals, labels, _subjects in loader:
         signals = signals.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
-        gradients = gradient_batch(parameters, model, signals, labels)
-        for name, values in gradients.items():
-            accumulator[name].add_(values.double().square().sum(dim=0))
-        completed += int(labels.shape[0])
-        if progress is not None:
-            progress(completed, len(indices))
+        for signal, label in zip(signals, labels, strict=True):
+            model.zero_grad(set_to_none=True)
+            logits = model(signal.unsqueeze(0))
+            F.cross_entropy(logits, label.unsqueeze(0)).backward()
+            for name, parameter in parameters.items():
+                if parameter.grad is None:
+                    raise DatasetProtocolError(
+                        f"Fisher parameter received no gradient: {name}"
+                    )
+                accumulator[name].add_(parameter.grad.detach().double().square())
+            completed += 1
+            if progress is not None:
+                progress(completed, len(indices))
     return OrderedDict(
         (name, (value / len(indices)).float().cpu())
         for name, value in accumulator.items()

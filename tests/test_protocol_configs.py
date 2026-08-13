@@ -133,6 +133,7 @@ def test_fisher_instrument_uses_exact_disjoint_split_halves() -> None:
     assert config["parameters"]["scope"] == "shared_plastic_backbone_only"
     assert config["parameters"]["exclude_task_head"] is True
     assert estimator["gradient_unit"] == "individual_example"
+    assert estimator["implementation"] == "standard_backward_per_example"
     assert estimator["model_mode"] == "eval"
     assert estimator["sample_count"] == 2 * estimator["split_half_samples"] == 1024
     assert estimator["gradient_microbatch_size"] == 1
