@@ -1,0 +1,36 @@
+schema_version: 1
+id: single_task_converged_v1
+status: locked
+mode: converged
+datasets: [bciciv2a, physionet_mi, sleep_edf_sc]
+manifest_version: v3
+seeds: [3407]
+head: flatten_mlp
+plastic_final_encoder_blocks: 4
+frozen_backbone_mode: eval
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  maximum_optimizer_steps: 5000
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+early_stopping:
+  monitor: mean_subject_balanced_accuracy
+  mode: max
+  patience_validations: 10
+  min_delta: 0.0
+  restore_best: true
+checkpoint:
+  best_validation: task_performance_ceiling
+notes:
+  - Validation curves showed patience 5 would stop Sleep at step 1600 before its observed step-2100 peak.
+  - This converged checkpoint supplies the single-task ceiling, not Fisher importance.

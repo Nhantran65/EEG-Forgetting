@@ -104,6 +104,20 @@ def test_budget_single_task_checkpoint_roles_are_locked() -> None:
     )
 
 
+def test_converged_single_task_early_stopping_is_locked() -> None:
+    config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
+    assert config["mode"] == "converged"
+    assert config["schedule"]["maximum_optimizer_steps"] == 5000
+    assert config["schedule"]["validation_interval_steps"] == 100
+    assert config["early_stopping"] == {
+        "monitor": "mean_subject_balanced_accuracy",
+        "mode": "max",
+        "patience_validations": 10,
+        "min_delta": 0.0,
+        "restore_best": True,
+    }
+
+
 def test_physionet_upstream_reproduction_contract_is_separate_from_manifest() -> None:
     config = load_yaml(
         ROOT / "configs" / "training" / "physionet_cbramod_reproduction.yaml"

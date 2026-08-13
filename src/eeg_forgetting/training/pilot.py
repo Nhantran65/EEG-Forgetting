@@ -46,6 +46,8 @@ class PilotSettings:
     gradient_clip_norm: float = 1.0
     label_smoothing: float = 0.1
     minimum_learning_rate: float = 1e-6
+    early_stopping_patience_validations: int | None = None
+    early_stopping_min_delta: float = 0.0
 
     def validate(self) -> None:
         if self.dataset not in TASK_CLASSES:
@@ -56,6 +58,13 @@ class PilotSettings:
             raise DatasetProtocolError(f"unknown pilot head: {self.head}")
         if self.optimizer_steps <= 0 or self.validation_interval_steps <= 0:
             raise DatasetProtocolError("pilot step counts must be positive")
+        if (
+            self.early_stopping_patience_validations is not None
+            and self.early_stopping_patience_validations <= 0
+        ):
+            raise DatasetProtocolError("early-stopping patience must be positive")
+        if self.early_stopping_min_delta < 0:
+            raise DatasetProtocolError("early-stopping min_delta cannot be negative")
 
 
 class FixedStepBatchSampler(Sampler[list[int]]):
@@ -206,6 +215,8 @@ def run_pilot(
     best_metric = -float("inf")
     best_step = 0
     best_state = None
+    stale_validations = 0
+    stop_reason = "maximum_steps"
     for step, (signals, labels, _subjects) in enumerate(train_loader, start=1):
         set_finetune_train_mode(model, settings.depth)
         signals = signals.to(device, non_blocking=True)
@@ -243,10 +254,22 @@ def run_pilot(
                 f"train_loss={point['train_loss']:.5f} subject_BA={metric:.5f}",
                 flush=True,
             )
-            if metric > best_metric:
+            if metric > best_metric + settings.early_stopping_min_delta:
                 best_metric = metric
                 best_step = step
                 best_state = copy.deepcopy(model.state_dict())
+                stale_validations = 0
+            else:
+                stale_validations += 1
+            patience = settings.early_stopping_patience_validations
+            if patience is not None and stale_validations >= patience:
+                stop_reason = "early_stopping"
+                print(
+                    f"{settings.dataset} early-stopped at step={step}; "
+                    f"best_step={best_step} subject_BA={best_metric:.5f}",
+                    flush=True,
+                )
+                break
     if best_state is None:
         raise DatasetProtocolError("pilot produced no validation checkpoint")
 
@@ -277,12 +300,14 @@ def run_pilot(
         ),
         "best_step": best_step,
         "best_mean_subject_balanced_accuracy": best_metric,
+        "completed_steps": int(curve[-1]["step"]),
+        "stop_reason": stop_reason,
         "curve": curve,
         "best_checkpoint": checkpoint_output.name,
         "best_checkpoint_sha256": sha256_file(checkpoint_output),
     }
     if save_final_checkpoint:
-        result["final_step"] = settings.optimizer_steps
+        result["final_step"] = int(curve[-1]["step"])
         result["final_validation"] = curve[-1]["validation"]
         result["final_checkpoint"] = final_checkpoint_output.name
         result["final_checkpoint_sha256"] = sha256_file(final_checkpoint_output)

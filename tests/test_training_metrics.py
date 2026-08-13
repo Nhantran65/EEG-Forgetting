@@ -105,3 +105,14 @@ def test_reproduction_refuses_existing_output_before_loading_data(
             output_dir=output,
             device="cpu",
         )
+
+
+def test_pilot_rejects_invalid_early_stopping_settings() -> None:
+    with pytest.raises(DatasetProtocolError, match="patience must be positive"):
+        PilotSettings(
+            dataset="bciciv2a", depth=4, early_stopping_patience_validations=0
+        ).validate()
+    with pytest.raises(DatasetProtocolError, match="min_delta cannot be negative"):
+        PilotSettings(
+            dataset="bciciv2a", depth=4, early_stopping_min_delta=-0.1
+        ).validate()

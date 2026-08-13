@@ -15,6 +15,10 @@ readable values live in `configs/`.
 - Run a separate converged, early-stopped single-task baseline for Week-1
   validation and task performance ceilings. Fisher signatures use the
   budget-matched checkpoints.
+- Converged runs validate every 100 optimizer steps, stop after 10 consecutive
+  non-improving validations, use `min_delta=0`, restore the best checkpoint,
+  and have a hard ceiling of 5,000 optimizer steps. Patience 5 is rejected
+  because the locked Sleep pilot would have stopped before its observed peak.
 - The frozen-backbone probe is `flatten(all channel-patch features) -> Linear`.
   A mean-pooled probe is only a negative control. During partial fine-tuning,
   frozen blocks remain in eval mode and only plastic blocks enable dropout.

@@ -325,6 +325,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn tất depth-v3 sweep và khóa final-4-block plasticity depth.
 - [x] Chạy exact-2.500-step single-task baseline depth 4 và lưu riêng best/final checkpoint cho ba task.
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
+- [ ] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -353,6 +354,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Budget-matched final step 2.500 đạt subject BA 0,5214/0,4441/0,6717 trên BCI/PhysioNet/Sleep; best validation tương ứng 0,5559@300, 0,4711@300 và 0,6784@2100. `final.pt` là authority cho Fisher/CL, không dùng `best.pt` thay thế.
 - 2026-08-13: Audit code upstream xác nhận PhysioNet external reproduction phải dùng 64 channel + CAR + high-pass 0,3 Hz + notch 60 Hz + 50 epoch full-backbone, không phải main harmonized 22-channel. Cache reproduction được tách tên/root để không thể dùng nhầm.
 - 2026-08-13: One-seed upstream PhysioNet reproduction (`seed=3407`, PyTorch 2.13.0+cu130) chọn epoch 33 theo validation kappa và đạt test BA 0,6229, kappa 0,4972, weighted-F1 0,6241. Các số này nằm trong 3 SD của mean 5-seed công bố 0,6417±0,0091 / 0,5222±0,0169 / 0,6427±0,0100; đây là external pipeline gate, không thay thế reproduction đủ 5 seed và không đi vào main result.
+- 2026-08-13: Converged baseline khóa validation mỗi 100 step, patience 10 validation, `min_delta=0`, restore-best và hard cap 5.000 step. Patience 5 bị loại vì retrospective simulation trên curve đã khóa sẽ dừng Sleep ở step 1.600 trước peak quan sát tại step 2.100.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
