@@ -327,7 +327,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy exact-2.500-step single-task baseline depth 4 và lưu riêng best/final checkpoint cho ba task.
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
 - [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
-- [ ] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
+- [x] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -361,6 +361,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Fisher instrument v1 dùng observed-label exact per-example empirical Fisher, uniform sample không hoàn lại từ natural train distribution, 1.024 mẫu chia hai half 512 rời nhau, model eval và chỉ final-4 plastic backbone blocks. Primary layer normalization là L2 trong từng encoder layer; top-k sensitivity chưa kích hoạt.
 - 2026-08-13: Fisher microbatch giảm 4 xuống 1 sau khi BCI/PhysioNet chạm OOM trên shared GPU có tiến trình ngoài; estimator vẫn là cùng tổng exact per-example squared gradients và sample indices không đổi. Toàn bộ batch-4 attempt được giữ dưới rejected results dù Sleep đã hoàn tất, rồi cả ba task được chạy lại cùng config digest để tránh một instrument set trộn execution config.
 - 2026-08-13: Attempt microbatch-1 dùng `torch.func` vẫn tăng VRAM theo thời gian và OOM trên BCI/PhysioNet; thay bằng standard backward từng example, tắt gradient cho mọi tham số ngoài final-4 block. Công thức observed-label per-example Fisher không đổi, nhưng graph được giải phóng mỗi mẫu; toàn bộ attempt cũ tiếp tục được giữ dưới rejected results.
+- 2026-08-13: Fisher instrument gate pass: split-half cosine BCI/PhysioNet/Sleep = 0,9957/0,9655/0,9873; cross-task cosine BCI–PhysioNet/BCI–Sleep/PhysioNet–Sleep = 0,8277/0,5672/0,5871. Minimum within-task 0,9655 vượt threshold 0,90 và margin trên maximum cross-task = 0,1378 vượt threshold 0,05. Không cần escalation 2.048 mẫu.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
