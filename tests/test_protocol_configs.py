@@ -135,5 +135,6 @@ def test_fisher_instrument_uses_exact_disjoint_split_halves() -> None:
     assert estimator["gradient_unit"] == "individual_example"
     assert estimator["model_mode"] == "eval"
     assert estimator["sample_count"] == 2 * estimator["split_half_samples"] == 1024
+    assert estimator["gradient_microbatch_size"] == 1
     assert config["normalization"]["primary"] == "l2_within_encoder_layer"
     assert config["instrument_gate"]["if_failed"].startswith("double_sample_count")

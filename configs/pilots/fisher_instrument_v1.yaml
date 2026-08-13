@@ -18,7 +18,7 @@ estimator:
   sampling: uniform_without_replacement_from_training_manifest
   sampling_seed: 3407
   split_half_samples: 512
-  gradient_microbatch_size: 4
+  gradient_microbatch_size: 1
 normalization:
   primary: l2_within_encoder_layer
   purpose: equal_layer_weight_in_cosine
@@ -31,4 +31,5 @@ instrument_gate:
 notes:
   - The pilot uses the natural training distribution; class-balanced Fisher is only a sensitivity analysis.
   - Split halves are disjoint subsets from one deterministic 1024-example sample.
+  - Microbatch size affects only memory and runtime; one preserves the same exact per-example estimator on shared GPUs.
   - Top-k Jaccard is not selected from this pilot and remains disabled until k is predeclared.
