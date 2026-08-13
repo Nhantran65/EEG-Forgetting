@@ -325,7 +325,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn tất depth-v3 sweep và khóa final-4-block plasticity depth.
 - [x] Chạy exact-2.500-step single-task baseline depth 4 và lưu riêng best/final checkpoint cho ba task.
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
-- [ ] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
+- [ ] Chạy converged single-task baseline với early stopping đã khóa trên ba task (đang chạy trong `eeg-conv-bci`, `eeg-conv-phys`, `eeg-conv-sleep`; log dưới `results/single_task/converged_v1/`).
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -384,7 +384,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 60 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, multiclass reproduction metrics, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 62 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, multiclass reproduction metrics, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
@@ -394,4 +394,4 @@ Observed implementation proof on 2026-08-13:
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step baselines và one-off PhysioNet reproduction đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là khóa/chạy converged baselines rồi tạo Fisher signatures; TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step baselines và one-off PhysioNet reproduction đã hoàn thành. Ba converged baselines đang chạy độc lập trong `tmux`; sau khi hoàn tất sẽ tạo Fisher signatures. TUEV vẫn cần xác nhận trước deadline truy cập.
