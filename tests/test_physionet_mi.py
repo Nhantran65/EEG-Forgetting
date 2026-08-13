@@ -1,4 +1,5 @@
 from eeg_forgetting.data.datasets.physionet_mi import (
+    CBRAMOD_PHYSIONET_CHANNELS,
     EXCLUDED_SUBJECTS,
     audit_run_inventory,
     cbramod_reproduction_split,
@@ -26,6 +27,12 @@ def test_reproduction_split_keeps_all_109_subjects() -> None:
     split = cbramod_reproduction_split()
     assert (len(split.train), len(split.validation), len(split.test)) == (70, 19, 20)
     assert "S088" in split.validation and "S100" in split.test
+
+
+def test_cbramod_reproduction_channel_order_is_exactly_64() -> None:
+    assert len(CBRAMOD_PHYSIONET_CHANNELS) == 64
+    assert CBRAMOD_PHYSIONET_CHANNELS[:4] == ("Fc5.", "Fc3.", "Fc1.", "Fcz.")
+    assert CBRAMOD_PHYSIONET_CHANNELS[-4:] == ("O1..", "Oz..", "O2..", "Iz..")
 
 
 def test_run_dependent_event_mapping() -> None:

@@ -282,7 +282,7 @@ class ManifestEEGLoader:
         self._bci = BCICIV2aLoader(registry)
         self._physio_main = PhysioNetMILoader(registry)
         self._physio_reproduction = PhysioNetMILoader(
-            registry, allow_excluded_for_reproduction=True
+            registry, cbramod_reproduction=True
         )
         self._sleep = SleepEDFLoader(registry)
 
@@ -321,7 +321,9 @@ class ManifestEEGLoader:
                 subject_number=unit.subject_number,
                 run=unit.run,
             )
-            expected_shape = (22, 4, 200)
+            expected_shape = (
+                (64, 4, 200) if unit.protocol == "reproduction" else (22, 4, 200)
+            )
         elif isinstance(unit, SleepRecordingUnit):
             samples = self._sleep.load_recording(unit.recording)
             expected_shape = (2, 30, 200)

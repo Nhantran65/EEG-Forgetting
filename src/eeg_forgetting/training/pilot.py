@@ -135,8 +135,19 @@ def run_pilot(
     checkpoint_sha256: str,
     output_dir: str | Path,
     device: str | torch.device,
+    save_final_checkpoint: bool = False,
+    protocol_config_path: str | Path | None = None,
 ) -> dict[str, object]:
     settings.validate()
+    output_dir = Path(output_dir)
+    checkpoint_output = output_dir / "best.pt"
+    final_checkpoint_output = output_dir / "final.pt"
+    result_output = output_dir / "result.json"
+    outputs = [checkpoint_output, result_output]
+    if save_final_checkpoint:
+        outputs.append(final_checkpoint_output)
+    if any(path.exists() for path in outputs):
+        raise DatasetProtocolError(f"refusing to overwrite pilot output {output_dir}")
     set_determinism(settings.seed)
     device = torch.device(device)
     torch.cuda.set_device(device)
@@ -239,13 +250,10 @@ def run_pilot(
     if best_state is None:
         raise DatasetProtocolError("pilot produced no validation checkpoint")
 
-    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_output = output_dir / "best.pt"
-    result_output = output_dir / "result.json"
-    if checkpoint_output.exists() or result_output.exists():
-        raise DatasetProtocolError(f"refusing to overwrite pilot output {output_dir}")
     torch.save(best_state, checkpoint_output)
+    if save_final_checkpoint:
+        torch.save(model.state_dict(), final_checkpoint_output)
     result = {
         "schema_version": 1,
         "pilot": settings.pilot_id,
@@ -255,6 +263,11 @@ def run_pilot(
             "validation": sha256_file(validation_data.index_path),
         },
         "pretrained_checkpoint_sha256": checkpoint_sha256,
+        "protocol_config_sha256": (
+            sha256_file(protocol_config_path)
+            if protocol_config_path is not None
+            else None
+        ),
         "device": str(device),
         "torch": torch.__version__,
         "train_samples": len(train_data),
@@ -268,6 +281,11 @@ def run_pilot(
         "best_checkpoint": checkpoint_output.name,
         "best_checkpoint_sha256": sha256_file(checkpoint_output),
     }
+    if save_final_checkpoint:
+        result["final_step"] = settings.optimizer_steps
+        result["final_validation"] = curve[-1]["validation"]
+        result["final_checkpoint"] = final_checkpoint_output.name
+        result["final_checkpoint_sha256"] = sha256_file(final_checkpoint_output)
     temporary = result_output.with_suffix(".json.tmp")
     with temporary.open("x", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2, sort_keys=True)

@@ -29,7 +29,9 @@ def _atomic_save_npy(path: Path, array: np.ndarray) -> None:
     temporary.replace(path)
 
 
-def _expected_sample_shape(dataset: str) -> tuple[int, int, int]:
+def _expected_sample_shape(dataset: str, protocol: str = "main") -> tuple[int, int, int]:
+    if dataset == "physionet_mi" and protocol == "reproduction":
+        return (64, 4, 200)
     shapes = {
         "bciciv2a": (22, 4, 200),
         "physionet_mi": (22, 4, 200),
@@ -47,11 +49,12 @@ def write_unit_cache(
     split: str,
     unit: ManifestUnit,
     samples: Sequence[EEGSample],
+    protocol: str = "main",
 ) -> dict[str, object]:
     root = Path(root)
     if not samples:
         raise DatasetProtocolError(f"{unit.unit_id}: cannot cache zero samples")
-    expected_shape = _expected_sample_shape(dataset)
+    expected_shape = _expected_sample_shape(dataset, protocol)
     if any(sample.signal.shape != expected_shape for sample in samples):
         raise DatasetProtocolError(f"{unit.unit_id}: inconsistent sample shape in cache input")
     if any(sample.subject_id != unit.subject_id for sample in samples):
@@ -90,6 +93,7 @@ def inspect_unit_cache(
     dataset: str,
     split: str,
     unit: ManifestUnit,
+    protocol: str = "main",
 ) -> dict[str, object] | None:
     root = Path(root)
     directory = root / dataset / split
@@ -101,7 +105,7 @@ def inspect_unit_cache(
         raise DatasetProtocolError(f"incomplete cache shard {unit.unit_id}")
     signals = np.load(signal_path, mmap_mode="r", allow_pickle=False)
     labels = np.load(label_path, mmap_mode="r", allow_pickle=False)
-    expected_shape = _expected_sample_shape(dataset)
+    expected_shape = _expected_sample_shape(dataset, protocol)
     if signals.dtype != np.float32 or signals.ndim != 4 or tuple(signals.shape[1:]) != expected_shape:
         raise DatasetProtocolError(f"invalid cached signal shard {signal_path}: {signals.shape}")
     if labels.dtype != np.int64 or labels.shape != (signals.shape[0],):
@@ -131,6 +135,7 @@ def write_cache_index(
     manifest_set_path: str | Path,
     manifest_version: str,
     shards: Sequence[dict[str, object]],
+    protocol: str = "main",
 ) -> Path:
     root = Path(root)
     path = root / dataset / split / "index.json"
@@ -138,6 +143,7 @@ def write_cache_index(
         "schema_version": CACHE_SCHEMA_VERSION,
         "dataset": dataset,
         "split": split,
+        "protocol": protocol,
         "manifest_version": manifest_version,
         "manifest_set_path": str(Path(manifest_set_path).resolve()),
         "manifest_set_sha256": sha256_file(manifest_set_path),

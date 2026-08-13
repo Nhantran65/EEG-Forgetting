@@ -44,7 +44,6 @@ def test_frozen_subject_splits_are_locked_in_config() -> None:
     assert sleep_split["stratify_fields"] == ["age", "sex"]
     assert sleep_split["seed"] == 20260813
 
-
 def test_tuev_contract_uses_pinned_16_channel_output() -> None:
     config = load_yaml(ROOT / "configs/datasets/tuev.yaml")
     assert config["preprocessing_authority"]["commit"] == (
@@ -92,3 +91,23 @@ def test_depth_v3_and_linear_probe_controls_are_explicit() -> None:
     assert sweep["frozen_backbone_mode"] == "eval"
     assert sweep["selection"]["candidate_depths"] == [1, 2, 4, 8]
     assert invalid["status"] == "invalid_frozen_backbone_dropout_confounded"
+
+
+def test_budget_single_task_checkpoint_roles_are_locked() -> None:
+    config = load_yaml(ROOT / "configs" / "training" / "single_task_budget.yaml")
+    assert config["mode"] == "budget_matched"
+    assert config["plastic_final_encoder_blocks"] == 4
+    assert config["schedule"]["optimizer_steps"] == 2500
+    assert config["checkpoints"]["best_validation"] == "diagnostic_only"
+    assert config["checkpoints"]["exact_final_step"] == (
+        "fisher_overlap_and_budget_matched_comparison"
+    )
+
+
+def test_physionet_upstream_reproduction_contract_is_separate_from_manifest() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "training" / "physionet_cbramod_reproduction.yaml"
+    )
+    assert config["input"]["channels"] == 64
+    assert config["training"]["epochs"] == 50
+    assert config["selection"]["metric"] == "validation_cohen_kappa"

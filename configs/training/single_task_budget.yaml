@@ -1,0 +1,31 @@
+schema_version: 1
+id: single_task_budget_v1
+status: locked
+mode: budget_matched
+datasets: [bciciv2a, physionet_mi, sleep_edf_sc]
+manifest_version: v3
+seeds: [3407]
+head: flatten_mlp
+plastic_final_encoder_blocks: 4
+frozen_backbone_mode: eval
+batch_size: 64
+optimizer:
+  name: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+schedule:
+  name: cosine_annealing
+  optimizer_steps: 2500
+  validation_interval_steps: 100
+  minimum_learning_rate: 0.000001
+checkpoints:
+  best_validation: diagnostic_only
+  exact_final_step: fisher_overlap_and_budget_matched_comparison
+notes:
+  - The exact step-2500 checkpoint is authoritative for Fisher and CL budget matching.
+  - The best checkpoint does not replace the final checkpoint in budget-matched analyses.

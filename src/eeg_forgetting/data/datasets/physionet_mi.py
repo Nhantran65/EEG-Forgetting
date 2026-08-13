@@ -14,6 +14,16 @@ from ..preprocessing import patchify, preprocess_mne_raw, scale_microvolts
 IMAGERY_RUNS = (4, 6, 8, 10, 12, 14)
 EXCLUDED_SUBJECTS = {88, 92, 100, 104}
 UNILATERAL_RUNS = {4, 8, 12}
+CBRAMOD_PHYSIONET_CHANNELS = (
+    "Fc5.", "Fc3.", "Fc1.", "Fcz.", "Fc2.", "Fc4.", "Fc6.", "C5..",
+    "C3..", "C1..", "Cz..", "C2..", "C4..", "C6..", "Cp5.", "Cp3.",
+    "Cp1.", "Cpz.", "Cp2.", "Cp4.", "Cp6.", "Fp1.", "Fpz.", "Fp2.",
+    "Af7.", "Af3.", "Afz.", "Af4.", "Af8.", "F7..", "F5..", "F3..",
+    "F1..", "Fz..", "F2..", "F4..", "F6..", "F8..", "Ft7.", "Ft8.",
+    "T7..", "T8..", "T9..", "T10.", "Tp7.", "Tp8.", "P7..", "P5..",
+    "P3..", "P1..", "Pz..", "P2..", "P4..", "P6..", "P8..", "Po7.",
+    "Po3.", "Poz.", "Po4.", "Po8.", "O1..", "Oz..", "O2..", "Iz..",
+)
 
 
 def event_label(run: int, description: str) -> int | None:
@@ -80,15 +90,15 @@ class PhysioNetMILoader:
         self,
         registry: ChannelRegistry,
         *,
-        allow_excluded_for_reproduction: bool = False,
+        cbramod_reproduction: bool = False,
     ):
         self.registry = registry
-        self.allow_excluded_for_reproduction = allow_excluded_for_reproduction
+        self.cbramod_reproduction = cbramod_reproduction
 
     def load_run(self, path: str | Path, *, subject_number: int, run: int) -> list[EEGSample]:
         if run not in IMAGERY_RUNS:
             raise DatasetProtocolError(f"run {run:02d} is not an imagery run")
-        if subject_number in EXCLUDED_SUBJECTS and not self.allow_excluded_for_reproduction:
+        if subject_number in EXCLUDED_SUBJECTS and not self.cbramod_reproduction:
             raise DatasetProtocolError(f"S{subject_number:03d} is excluded by direct EDF audit")
 
         raw = mne.io.read_raw_edf(path, preload=True, verbose="ERROR")
@@ -99,17 +109,29 @@ class PhysioNetMILoader:
         counts = audit_run_inventory(
             descriptions,
             sampling_rate_hz=float(raw.info["sfreq"]),
-            strict_clean_protocol=not self.allow_excluded_for_reproduction,
+            strict_clean_protocol=not self.cbramod_reproduction,
             context=str(path),
         )
 
-        prepared = preprocess_mne_raw(
-            raw,
-            source_channels=raw.ch_names,
-            registry=self.registry,
-            montage="bciciv2a_22",
-            common_average_reference=True,
-        )
+        if self.cbramod_reproduction:
+            missing = [name for name in CBRAMOD_PHYSIONET_CHANNELS if name not in raw.ch_names]
+            if missing:
+                raise DatasetProtocolError(f"{path}: missing upstream channels {missing}")
+            prepared = raw.copy().pick(list(CBRAMOD_PHYSIONET_CHANNELS))
+            prepared.set_eeg_reference("average", projection=False, verbose="ERROR")
+            prepared.filter(0.3, None, verbose="ERROR")
+            prepared.notch_filter(60.0, verbose="ERROR")
+            prepared.resample(200.0, verbose="ERROR")
+            expected_channels = 64
+        else:
+            prepared = preprocess_mne_raw(
+                raw,
+                source_channels=raw.ch_names,
+                registry=self.registry,
+                montage="bciciv2a_22",
+                common_average_reference=True,
+            )
+            expected_channels = 22
         subject_id = f"S{subject_number:03d}"
         samples: list[EEGSample] = []
         movement_index = 0
@@ -120,8 +142,8 @@ class PhysioNetMILoader:
                 continue
             start = int(round(float(onset) * prepared.info["sfreq"]))
             signal_uv = prepared.get_data(start=start, stop=start + 800, units="uV")
-            if signal_uv.shape != (22, 800):
-                if self.allow_excluded_for_reproduction:
+            if signal_uv.shape != (expected_channels, 800):
+                if self.cbramod_reproduction:
                     incomplete_events.append(movement_index)
                     movement_index += 1
                     continue
@@ -146,9 +168,9 @@ class PhysioNetMILoader:
                 RuntimeWarning,
                 stacklevel=2,
             )
-        if not self.allow_excluded_for_reproduction and len(samples) != 15:
+        if not self.cbramod_reproduction and len(samples) != 15:
             raise DatasetProtocolError(f"{path}: expected 15 movement events, got {len(samples)}")
-        if not self.allow_excluded_for_reproduction and len(samples) != expected_movements:
+        if not self.cbramod_reproduction and len(samples) != expected_movements:
             raise DatasetProtocolError(
                 f"{path}: extracted {len(samples)} of {expected_movements} movement events"
             )

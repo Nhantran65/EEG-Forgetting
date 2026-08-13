@@ -38,6 +38,7 @@ def _build_unit(dataset: str, split: str, unit) -> dict[str, object]:
         split=split,
         unit=unit,
         samples=samples,
+        protocol=str(getattr(unit, "protocol", "main")),
     )
 
 
@@ -49,7 +50,7 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "manifests" / "v3" / "manifest-set.json",
     )
     parser.add_argument(
-        "--cache-root", type=Path, default=PROJECT_ROOT / "data" / "processed" / "v3"
+        "--cache-root", type=Path
     )
     parser.add_argument(
         "--datasets",
@@ -64,11 +65,21 @@ def parse_args() -> argparse.Namespace:
         default=("train", "validation"),
     )
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument(
+        "--physionet-protocol", choices=("main", "reproduction"), default="main"
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.physionet_protocol == "reproduction" and args.datasets != ["physionet_mi"]:
+        raise ValueError("reproduction cache must contain only physionet_mi")
+    cache_root = args.cache_root or (
+        PROJECT_ROOT / "data" / "processed" / "v3-physionet-cbramod-reproduction"
+        if args.physionet_protocol == "reproduction"
+        else PROJECT_ROOT / "data" / "processed" / "v3"
+    )
     manifests = FrozenManifestSet(args.manifest_set, project_root=PROJECT_ROOT)
     registry = ChannelRegistry.from_yaml(PROJECT_ROOT / "configs" / "channels.yaml")
     loader = ManifestEEGLoader(manifests, registry)
@@ -79,7 +90,7 @@ def main() -> None:
         ProcessPoolExecutor(
             max_workers=args.workers,
             initializer=_initialize_worker,
-            initargs=(str(args.manifest_set.resolve()), str(args.cache_root.resolve())),
+            initargs=(str(args.manifest_set.resolve()), str(cache_root.resolve())),
         )
         if args.workers > 1
         else None
@@ -87,12 +98,20 @@ def main() -> None:
     try:
         for dataset in args.datasets:
             for split in args.splits:
-                units = loader.units(dataset, split)
+                units = loader.units(
+                    dataset,
+                    split,
+                    physionet_protocol=args.physionet_protocol,
+                )
                 by_unit: dict[str, dict[str, object]] = {}
                 missing = []
                 for unit in units:
                     shard = inspect_unit_cache(
-                        args.cache_root, dataset=dataset, split=split, unit=unit
+                        cache_root,
+                        dataset=dataset,
+                        split=split,
+                        unit=unit,
+                        protocol=str(getattr(unit, "protocol", "main")),
                     )
                     if shard is None:
                         missing.append(unit)
@@ -104,7 +123,7 @@ def main() -> None:
                     flush=True,
                 )
                 if executor is None:
-                    _initialize_worker(str(args.manifest_set.resolve()), str(args.cache_root.resolve()))
+                    _initialize_worker(str(args.manifest_set.resolve()), str(cache_root.resolve()))
                     for number, unit in enumerate(missing, start=1):
                         shard = _build_unit(dataset, split, unit)
                         by_unit[unit.unit_id] = shard
@@ -129,12 +148,17 @@ def main() -> None:
                         )
                 shards = [by_unit[unit.unit_id] for unit in units]
                 index_path = write_cache_index(
-                    args.cache_root,
+                    cache_root,
                     dataset=dataset,
                     split=split,
                     manifest_set_path=args.manifest_set,
                     manifest_version=manifests.version,
                     shards=shards,
+                    protocol=(
+                        args.physionet_protocol
+                        if dataset == "physionet_mi"
+                        else "main"
+                    ),
                 )
                 summaries.append(
                     {

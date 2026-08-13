@@ -99,3 +99,16 @@ uv run python scripts/summarize_cbramod_depth_pilot.py
 Depth v3 selected the final four encoder blocks by the predeclared 95% rule;
 the evidence and rejected pilot history are recorded in
 `docs/decisions/0001-lock-cbramod-head-and-depth.md`.
+
+Budget-matched single-task runs save two explicitly different artifacts:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 uv run python scripts/run_single_task_baseline.py \
+  --dataset bciciv2a --device cuda:0
+```
+
+`best.pt` is a validation diagnostic; `final.pt` is the exact step-2,500
+checkpoint used for Fisher and budget-matched comparisons. The one-off
+PhysioNet external reproduction is separate again: it uses the upstream
+64-channel preprocessing and 50-epoch full-backbone protocol through
+`scripts/run_physionet_cbramod_reproduction.py`.

@@ -44,7 +44,10 @@ channels shared with BCI IV-2a.
 Direct EDF audit excludes S088, S092, S100, and S104. IDs are never renumbered.
 The main clean split contains 70/18/17 train/validation/test subjects. One
 separate run uses the original unfiltered CBraMod 70/19/20 split solely to
-validate the external preprocessing-to-checkpoint pipeline.
+validate the external preprocessing-to-checkpoint pipeline. That reproduction
+also retains the upstream 64-channel order, CAR, 0.3 Hz high-pass, 60 Hz notch,
+200 Hz resampling, all-patch head, full-backbone fine-tuning and 50 epochs. It
+is not a main harmonized result and does not supply a Fisher signature.
 
 ## Sleep-EDF Expanded
 

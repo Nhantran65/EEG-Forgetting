@@ -323,6 +323,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Materialize cache train/validation resumable từ manifest v3 cho cả ba task.
 - [x] Khóa classifier family `flatten_mlp` và định nghĩa fair all-patch linear probe.
 - [x] Hoàn tất depth-v3 sweep và khóa final-4-block plasticity depth.
+- [x] Chạy exact-2.500-step single-task baseline depth 4 và lưu riêng best/final checkpoint cho ba task.
+- [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -348,6 +350,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Depth sweep v2 bị invalid vì `model.train()` bật dropout trong các block đã freeze và làm representation upstream stochastic. Sweep v3 giữ frozen blocks ở eval mode, chỉ classifier và final-N plastic blocks ở train mode.
 - 2026-08-13: Cache v3 materialize 2.678/982 BCI trial, 6.300/1.620 PhysioNet trial và 118.662/39.580 Sleep epoch cho train/validation; mọi index bind vào manifest-set digest.
 - 2026-08-13: Depth v3 chọn 4 block cuối theo rule đã khóa: mean normalized validation BA 0,4335 vượt ngưỡng 0,4249 (=95% best 0,4473 ở depth 8). Fair all-patch linear probe lần lượt đạt 0,4902/0,4319/0,5802 BA; selected depth đạt 0,5559/0,4711/0,6784 trên BCI/PhysioNet/Sleep.
+- 2026-08-13: Budget-matched final step 2.500 đạt subject BA 0,5214/0,4441/0,6717 trên BCI/PhysioNet/Sleep; best validation tương ứng 0,5559@300, 0,4711@300 và 0,6784@2100. `final.pt` là authority cho Fisher/CL, không dùng `best.pt` thay thế.
+- 2026-08-13: Audit code upstream xác nhận PhysioNet external reproduction phải dùng 64 channel + CAR + high-pass 0,3 Hz + notch 60 Hz + 50 epoch full-backbone, không phải main harmonized 22-channel. Cache reproduction được tách tên/root để không thể dùng nhầm.
+- 2026-08-13: One-seed upstream PhysioNet reproduction (`seed=3407`, PyTorch 2.13.0+cu130) chọn epoch 33 theo validation kappa và đạt test BA 0,6229, kappa 0,4972, weighted-F1 0,6241. Các số này nằm trong 3 SD của mean 5-seed công bố 0,6417±0,0091 / 0,5222±0,0169 / 0,6427±0,0100; đây là external pipeline gate, không thay thế reproduction đủ 5 seed và không đi vào main result.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -377,13 +382,14 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 51 tests passed, including manifest/config tamper checks, cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 60 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, multiclass reproduction metrics, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
 - Real preprocessing smoke through manifest v3 passed on A01E (281 non-artifact trials, 4 classes, `22x4x200`), S001R04 (15 trials, `22x4x200`), and SC00 night 1 (841 epochs, 5 stages, `2x30x200`); every signal was finite `float32` in CBraMod units.
 - CBraMod adapter strict-loaded all 211 checkpoint tensors (4,924,000 parameters) and matched pinned upstream output exactly (`max_abs_diff=0.0`). On one L40S with PyTorch 2.13.0+cu130, real batch-size-2 forward/loss/backward passed for BCI, PhysioNet and Sleep with finite non-zero last-block gradients.
+- PhysioNet reproduction cache matched the pinned upstream preprocessing exactly on S001R04 (`15x64x4x200`, `max_abs_diff=0.0`), contained the same 9.837 examples across 70/19/20 subjects, and reproduced the upstream classifier initialization bit-for-bit. The completed 50-epoch run selected epoch 33 and produced test BA 0,6229, kappa 0,4972 and weighted-F1 0,6241; checkpoint/config digests re-verified after the run.
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes và head/depth selection đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là chạy converged + exact-2.500-step single-task baselines ở depth 4, một PhysioNet reproduction 70/19/20, rồi tạo Fisher signatures; TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step baselines và one-off PhysioNet reproduction đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là khóa/chạy converged baselines rồi tạo Fisher signatures; TUEV vẫn cần xác nhận trước deadline truy cập.

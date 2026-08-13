@@ -1,0 +1,35 @@
+schema_version: 1
+id: physionet_cbramod_reproduction_v1
+status: locked_one_off_external_validation
+dataset: physionet_mi
+manifest_version: v3
+split: cbramod_original_70_19_20
+seed: 3407
+input:
+  channels: 64
+  patches: 4
+  points: 200
+  reference: common_average
+  highpass_hz: 0.3
+  lowpass_hz: null
+  notch_hz: 60
+  amplitude_divisor_microvolts: 100
+model:
+  head: flatten_mlp
+  backbone_trainable: full
+  frozen_backbone_mode: not_applicable
+training:
+  epochs: 50
+  batch_size: 64
+  optimizer: AdamW
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+selection:
+  metric: validation_cohen_kappa
+  restore_best: true
+purpose: validate_the_upstream_preprocessing_to_checkpoint_chain_not_a_main_experiment
