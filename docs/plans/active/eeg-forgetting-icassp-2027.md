@@ -329,7 +329,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
 - [x] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
 - [ ] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints (đang chạy trong `eeg-cl-forward` trên GPU 0 và `eeg-cl-reverse` trên GPU 2).
-- [ ] Chạy main sequential FT matrix 3 order × 3 seed và stability gate trước EWC/DER++.
+- [ ] Chạy main sequential FT matrix 3 order × 3 seed và stability gate trước EWC/DER++ (đang chạy qua đêm: `eeg-cl-main-gpu0` 5 run, `eeg-cl-main-gpu2` 4 run; `eeg-cl-main-summary` tự verify/tổng hợp).
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -395,7 +395,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 71 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance rules, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 73 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance/replicate-summary rules, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
