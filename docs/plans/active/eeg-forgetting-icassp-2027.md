@@ -15,7 +15,7 @@ Hoàn thành một submission ICASSP 2027 dài 4 trang kỹ thuật (+ trang tà
 Bài không đề xuất phương pháp continual-learning mới. Đóng góp chính là một chẩn đoán có kiểm chứng can thiệp:
 
 1. Đo overlap tham số bằng Fisher importance từ các mô hình single-task độc lập, cùng khởi tạo từ CBraMod pretrained.
-2. Liên hệ overlap với pairwise relative forgetting qua bốn task EEG khác nhau.
+2. Liên hệ overlap với pairwise relative forgetting qua ba task EEG đã có và TUEV nếu quyền truy cập hoàn tất đúng hạn.
 3. Kiểm chứng vị trí tham số bằng high-overlap freeze so với random-freeze tại mức hiệu năng task mới tương đương.
 4. Grounding kết quả bằng một panel nhỏ channel–frequency đặc thù EEG.
 
@@ -26,8 +26,9 @@ Deadline mục tiêu: 2026-09-16.
 - [Plan ban đầu](../../../plan%20new%20paper.md) là nguồn ý tưởng; file này thay thế nó làm execution plan hiện hành.
 - Qian et al., *Learn and Don't Forget: Adding a New Language to ASR Foundation Models*, đã dùng Fisher overlap để dự báo nguy cơ quên ngôn ngữ trong Whisper. Vì phân tích của họ về bản chất đã mang tính prospective, “prospective overlap” không được xem là novelty độc lập: <https://www.isca-archive.org/interspeech_2024/qian24_interspeech.pdf>.
 - EvoBrain dùng spectral affinity để điều khiển transfer. Delta của bài này là dùng overlap để chẩn đoán/giải thích forgetting và kiểm chứng bằng can thiệp, không dùng affinity để tạo một CL method mới: <https://arxiv.org/abs/2606.01767>.
-- VEP public dataset: DOI <https://doi.org/10.17632/g9shp2gxhy.2>. Snapshot hiện tại có 31 subject, 59 recording sử dụng được và 3.612 cửa sổ 1 giây.
-- Nguồn VEP nội bộ đã được người dùng xác nhận: `/home/kiettqa/EEG-Foundation-Model-Paper/README.md`, `paper2_benchmark/manifests/current_vep/audit.json`, `paper2_benchmark/configs/datasets/current_vep.yaml`, và manifest README cùng thư mục.
+- Audit trực tiếp VEP cho thấy 0 marker trong 64 JSON, 0 annotation trong 63 EDF, và phase-crossover BA xấp xỉ chance 0,25. VEP bị quarantine khỏi RQ2, CL matrix và physiological claims; manifest/adapter cũ vẫn được giữ để audit paper trước.
+- TUEV là task thứ tư có điều kiện. Preprocessing phải tái dùng đúng code CBraMod commit `b9e961003214326972c567eff390e75b0287e32a`; output thực tế là 16 TCP bipolar channel x 5 patch x 200 điểm, không phải 23 channel model input.
+- Ba dataset công khai đã được materialize dưới `data/raw/`: BCI IV-2a có 18 GDF + official true labels, PhysioNet-MI có 109 x 6 imagery-run EDF, Sleep Cassette có 153 cặp PSG/hypnogram trên 78 subject. Checksum/ZIP CRC và source-level annotation audit đều pass.
 - Quy định ICASSP: 4 trang nội dung kỹ thuật, trang thứ năm chỉ dành cho references: <https://2027.ieeeicassp.org/publishing-and-paper-presentation-options/>.
 
 ## Research Questions And Claims
@@ -38,7 +39,7 @@ Overlap Fisher giữa task `i` và `j` có liên hệ với mức quên tương 
 
 Claim tối đa được phép nếu kết quả ủng hộ:
 
-> Pre-CL parameter-importance overlap is associated with pairwise forgetting within this heterogeneous four-task EEG benchmark.
+> Pre-CL parameter-importance overlap is associated with pairwise forgetting within this heterogeneous EEG benchmark.
 
 Không claim universal predictor, không claim causality chỉ từ correlation, và không claim “first”.
 
@@ -60,7 +61,7 @@ EvoBrain phải được nêu riêng: họ dùng spectral affinity để điều
 In scope:
 
 - Một backbone duy nhất: CBraMod.
-- Bốn task/dataset: BCI Competition IV-2a, PhysioNet-MI, Sleep-EDF Expanded, và VEP Mendeley.
+- Ba task chắc chắn: BCI Competition IV-2a, PhysioNet-MI và Sleep-EDF Expanded; TUEV là task thứ tư nếu có dữ liệu chạy được trước 2026-08-19.
 - Main methods: sequential fine-tuning, EWC, DER++, và joint training làm upper bound.
 - EvoBrain chỉ giữ nếu reproduce được trước cổng cuối Tuần 2.
 - Một plasticity depth chính, chọn từ sweep 1/2/4/8 block.
@@ -78,36 +79,33 @@ Out of scope:
 - Full attribution-drift analysis D3.
 - Grad-CAM, PhysioNet 64-channel, class-balanced replay và replay-method intervention, trừ khi còn thời gian.
 - Cohort split giả lập thành nhiều task.
+- VEP trong main RQ2, continual-learning matrix hoặc physiological claims.
 
 ## Dataset Protocol
 
 | Task | Main definition | Subject | Vai trò |
 |---|---|---:|---|
 | BCI IV-2a | 4-class motor imagery, 22 kênh | 9 | MI low-subject; cần split robustness riêng |
-| PhysioNet-MI | MI protocol phải khóa đúng run/label trong Tuần 1; main dùng montage 22 kênh khớp BCI IV-2a | 109 | Cặp cùng paradigm, khác dataset |
+| PhysioNet-MI | Runs 04/06/08/10/12/14, bỏ T0, 4-class theo run; main dùng 22 kênh khớp BCI IV-2a; clean split giữ 105 subject | 105 main / 109 reproduction | Cặp cùng paradigm, khác dataset |
 | Sleep-EDF Expanded | 5-class sleep staging, 30 giây, bipolar | 78 | Task khác paradigm; chỉ tham gia cross-task spectral analysis |
-| VEP Mendeley | 4 visual-condition labels, 14 kênh, cửa sổ 1 giây | 31 usable | Task thị giác low-density; tương phản vùng chẩm nếu được dữ liệu ủng hộ |
+| TUEV v2.0.0 | 6-class event classification, 16 TCP bipolar, cửa sổ 5 giây | access pending | Task thứ tư nếu tải và preprocess chạy được đúng hạn |
 
-### VEP-specific safeguards
+### VEP quarantine
 
-- Dùng subject-disjoint split; tuyệt đối không split epoch ngẫu nhiên.
-- Các cửa sổ overlap 50% và các epoch cùng recording không được xem là quan sát độc lập.
-- Metric và bootstrap phải aggregate/cluster theo subject; recording được giữ trọn trong subject split.
-- Nhãn được suy từ thư mục recording, không phải stimulus marker. Vì vậy gọi thận trọng là “visual-condition EEG/VEP dataset”, không diễn giải như stimulus-locked ERP/VEP.
-- Kiểm tra performance theo class, subject, phase và recording. Nếu model chủ yếu học recording/phase artifact hoặc kết quả không ổn định theo subject, VEP không được dùng làm bằng chứng sinh lý.
-- Không mặc định attribution phải nổi bật vùng chẩm; chỉ diễn giải nếu occlusion và IG cùng ủng hộ.
-- 1 recording thiếu và 4 recording preprocessing-fail phải được cố định trong manifest, không silently thay đổi giữa run.
+- Không dùng VEP trong main experiments vì label suy từ recording folder, không có marker/annotation để khôi phục stimulus timing, và phase-crossover 4-class ở chance.
+- Giữ pluggable adapter, manifest và legacy subject-disjoint result để audit mâu thuẫn giữa kết quả cũ và phase-crossover; audit này thuộc paper cũ, không chặn paper hiện tại.
 
 ### Shared preprocessing and channel policy
 
 - Patch dài 1 giây; Sleep giữ epoch 30 giây dưới dạng chuỗi patch.
-- Common analysis bandwidth: 0,5–40 Hz; ghi lại rõ VEP nguồn đã qua pipeline 0,1–50 Hz.
-- Resample về tần số mà CBraMod checkpoint yêu cầu; kiểm tra implementation trước khi chốt 200 Hz. Không giả định nội suy 128 Hz thành 200 Hz tự tạo thêm thông tin.
-- Z-score theo kênh chỉ dùng thống kê train split; không dùng test statistics.
+- Common analysis bandwidth: 0,5–40 Hz; resample về 200 Hz.
+- Normalization theo code CBraMod: đổi sang microvolt rồi chia 100; không fit z-score hay bất kỳ thống kê train/test nào.
 - Dùng channel registry và canonical order cố định. Không dùng learned Conv1D để ánh xạ montage.
 - Verify CBraMod downstream code nhận số kênh thay đổi. Nếu hard-code, dùng pad-and-mask vào registry chung.
 - PhysioNet main dùng tập 22 kênh tương ứng BCI IV-2a; bản 64 kênh chỉ là robustness optional.
 - Sleep-EDF bipolar không được chiếu thành vị trí điện cực giả. Cross-task channel-space analysis giới hạn ở montage có ý nghĩa; Sleep chỉ so trong frequency space.
+- TUEV giữ đúng 16 TCP bipolar derivation từ preprocessing CBraMod đã pin; không tự viết lại pipeline 23-to-16.
+- TUEV có một reference reproduction giữ nguyên filter upstream 0,3–75 Hz + notch 60 Hz. Main harmonized giữ nguyên montage/event/split code nhưng đổi filter trên raw liên tục thành 0,5–40 Hz trước khi cắt event; không refilter cửa sổ 5 giây.
 - Với cửa sổ 1 giây, tránh diễn giải mạnh năng lượng rất thấp dưới khoảng 2 Hz.
 
 ## Model And Training Design
@@ -116,8 +114,10 @@ Out of scope:
 - Khi chuyển task, head cũ được đóng băng; backbone vẫn là phần có thể bị ghi đè.
 - Không dùng task-specific adapter trong main experiment.
 - Sweep nhanh unfreeze `1/2/4/8` block cuối bằng sequential FT trên một order và một seed.
-- Đồng thời chạy single-task baselines cho cả bốn task. Chọn một depth duy nhất: depth nhỏ nhất đạt ít nhất 95% best mean normalized validation BA qua bốn task. Không chọn depth dựa trên mức forgetting.
+- Đồng thời chạy single-task baselines cho mọi task có trong benchmark đã khóa sau deadline TUEV. Chọn một depth duy nhất: depth nhỏ nhất đạt ít nhất 95% best mean normalized validation BA qua các task đó. Không chọn depth dựa trên mức forgetting.
 - Khóa common preprocessing, optimizer family, schedule và validation budget sau pilot.
+- Tách single-task run thành (a) converged/early-stopped cho Week-1 gate và trần `F_rel`, và (b) budget-matched đúng 2.500 optimizer step cho Fisher/overlap và đối chiếu CL.
+- Log validation curve BCI IV-2a mỗi 100 step tới 2.500 để biết checkpoint budget-matched nằm trước hay sau peak.
 - Method-specific hyperparameter được tune với cùng validation budget; không tune lại theo order/seed.
 
 Main methods:
@@ -229,8 +229,8 @@ Không thêm hình thứ ba vào main paper.
 ### Week 1 — 2026-08-13 to 2026-08-19: protocol and instrument
 
 - Khóa task definition, label mapping và split manifest cho cả bốn dataset.
-- Audit VEP theo subject/recording/phase/class và xác nhận không leakage.
-- Gửi yêu cầu truy cập TUEV ngay đầu tuần chỉ làm fallback bảo hiểm.
+- Quarantine VEP theo kết quả marker/annotation/phase-crossover audit; audit riêng kết quả subject-disjoint cũ không chặn main work.
+- Xin quyền và tải TUEV v2.0.0; deadline cứng 2026-08-19, sau đó tiếp tục với ba task và hạ claim nếu chưa chạy được.
 - Verify CBraMod checkpoint, variable-channel behavior, patching và preprocessing.
 - Chạy linear probe và single-task FT baselines.
 - Chạy sweep FT 1/2/4/8 block nhanh; chọn một depth chính bằng validation rule.
@@ -242,7 +242,7 @@ Gate cuối Tuần 1:
 - Performance hợp lý so với reference có cùng protocol, không dùng một ngưỡng công bố sai protocol.
 - Fine-tune phải tốt hơn linear probe đủ rõ để chứng minh phần plastic thực sự học.
 - Fisher overlap phải có độ phân giải: same-task qua seed/split ổn định và tách được cross-task.
-- VEP phải qua audit leakage/confound và có performance subject-disjoint ổn định. Nếu fail, kích hoạt TUEV ngay; không chờ tới Tuần 3.
+- Chạy một PhysioNet single-task reproduction với split CBraMod gốc 70/19/20 không lọc subject để kiểm tra chuỗi preprocessing-to-checkpoint từ bên ngoài.
 
 ### Week 2 — 2026-08-20 to 2026-08-26: continual-learning matrix
 
@@ -284,7 +284,7 @@ Gate cuối Tuần 3:
 Gate cuối Tuần 4:
 
 - Nếu RQ2 ổn định qua layer/condition: dùng cautious association claim.
-- Nếu RQ2 yếu/null: báo null có giới hạn trong four-task benchmark; giữ causal intervention làm headline nếu nó thành công.
+- Nếu RQ2 yếu/null: báo null có giới hạn trong benchmark đã khóa; giữ causal intervention làm headline nếu nó thành công.
 - Nếu cả association và intervention đều fail: không claim predictor; đánh giá chuyển journal hoặc reframing trước khi nộp.
 
 ### Submission buffer — 2026-09-10 to 2026-09-16
@@ -295,7 +295,8 @@ Gate cuối Tuần 4:
 ## Risks And Recovery
 
 - **Novelty overlap với Qian:** cite trực tiếp; novelty dựa vào EEG grounding + systematic sequential benchmark + matched causal intervention.
-- **VEP recording-level confound:** subject/recording audit, conservative naming và no physiological claim nếu evidence không hội tụ; TUEV là fallback chỉ khi được kích hoạt trong Tuần 1.
+- **TUEV access/dung lượng:** deadline cứng 2026-08-19; nếu chưa có snapshot chạy được thì khóa benchmark ba task và hạ claim, không để dataset thứ tư làm trôi lịch.
+- **VEP recording-level confound:** đã quarantine khỏi main; audit legacy subject-disjoint result là workstream riêng.
 - **BCI IV-2a chỉ 9 subject:** per-subject logging và split robustness sớm; không giả vờ tăng power bằng epoch count.
 - **Overlap có ít independent task pairs:** effect size, interval, leave-one-pair-out và cautious claim; không quảng bá universal prediction.
 - **Forgetting quá nhỏ:** plasticity-depth sweep và challenging order đã predeclare.
@@ -309,12 +310,14 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 ## Progress
 
 - [x] Chốt diagnostic/XAI scope và CBraMod-only backbone.
-- [x] Chốt bốn dataset; VEP là task thứ tư, TUEV chỉ fallback.
+- [x] Chốt ba dataset chính và TUEV là task thứ tư có điều kiện; VEP bị quarantine.
 - [x] Chốt main methods, metrics, memory accounting và page budget.
 - [x] Đọc và định vị novelty so với Qian et al. và EvoBrain.
-- [x] Chốt VEP subject count, montage, preprocessing và các hạn chế.
-- [ ] Khóa exact PhysioNet-MI runs/labels và Sleep-EDF subset/protocol.
-- [ ] Tạo immutable dataset/split manifests.
+- [x] Audit VEP marker/annotation/phase-crossover và chốt quarantine.
+- [x] Khóa exact BCI IV-2a, PhysioNet-MI, Sleep-EDF và shared preprocessing/training-budget protocol.
+- [x] Hoàn thành package config/registry/raw-loader/TUEV-adapter/manifest tooling và focused synthetic tests.
+- [x] Tải, checksum và source-audit ba dataset công khai đã khóa.
+- [x] Tạo immutable dataset/split manifests.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -326,9 +329,15 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Bài là diagnostic/XAI paper, không đề xuất continual-learning method mới.
 - 2026-08-13: CBraMod là backbone duy nhất; shared backbone + task-specific heads; không adapter trong main.
 - 2026-08-13: Unfreeze-depth sweep 1/2/4/8 là pilot; main dùng một depth chọn bằng single-task validation, không chọn theo forgetting.
-- 2026-08-13: Bốn task chính là BCI IV-2a, PhysioNet-MI, Sleep-EDF và VEP; không cohort-split.
-- 2026-08-13: VEP được giữ vì có 31 usable subjects và tạo tương phản thị giác/low-density; phải diễn giải thận trọng do label recording-level và window overlap.
-- 2026-08-13: TUEV chỉ là fallback được kích hoạt trong Tuần 1 nếu VEP fail audit.
+- 2026-08-13: BCI IV-2a, PhysioNet-MI và Sleep-EDF là ba task đã khóa; TUEV thay VEP nếu có dữ liệu chạy được trước deadline Tuần 1.
+- 2026-08-13: VEP bị quarantine vì không có marker/annotation và phase-crossover ở chance; không dùng để chặn implementation ba dataset còn lại.
+- 2026-08-13: BCI IV-2a đọc nhãn E từ `A0xE.mat`, dùng `[2,6)` giây, bỏ EOG/artifact, gộp T+E trong subject và fail loud nếu session không đủ 6 run/288 trial/4 class cân bằng trước artifact.
+- 2026-08-13: Real GDF audit xác nhận marker 32766 cũng bao quanh EOG calibration; MI-run audit chỉ đếm block có trial marker và yêu cầu đúng 6 x 48 trial, nhờ vậy A04T short-EOG không bị loại nhầm.
+- 2026-08-13: PhysioNet main loại S088/S092/S100/S104, giữ ID gốc và split 70/18/17; chạy đúng một reproduction unfiltered 70/19/20 theo CBraMod.
+- 2026-08-13: Sleep Cassette split tuyệt đối theo subject 48/15/15, giữ hai đêm cùng split, gộp N3+N4, bỏ movement/unknown và crop wake theo thời gian ±30 phút.
+- 2026-08-13: Freeze manifest v1: BCI main A01–A05/A06–A07/A08–A09; Sleep stratify `age-band x sex` với seed 20260813; PhysioNet giữ cả clean split và reproduction split trong cùng subject manifest.
+- 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
+- 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
 - 2026-08-13: Replay equalized theo persistent bytes; EWC memory gồm Fisher + `theta*`; DER++ giữ reservoir gốc.
 - 2026-08-13: Prospective Fisher overlap không phải novelty độc lập vì Qian et al. đã có logic gần tương đương trong Whisper.
@@ -339,11 +348,11 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 
 - Focused proof:
   - Unit tests cho `R`, AA, BWT, AF, `F`, `F_rel`, near-chance handling và memory accounting.
-  - Dataset audit: unique subject across split; recording integrity; VEP missing/fail manifest; class/age distribution.
-  - Shape/mask smoke tests cho 2/14/22-channel inputs và 30-second Sleep sequence.
+  - Dataset audit: unique subject across split; recording integrity; exact exclusion/event inventories; class/age/sex distribution.
+  - Shape/mask smoke tests cho 2/16/22-channel inputs và 30-second Sleep sequence.
   - Deterministic same-task Fisher reproducibility check.
 - Integration proof:
-  - Một four-task sequential FT run end-to-end, gồm checkpoint, `R[i,j,s]`, overlap extraction và intervention mask.
+  - Một sequential FT run end-to-end qua mọi task trong benchmark đã khóa, gồm checkpoint, `R[i,j,s]`, overlap extraction và intervention mask.
   - Recompute main table/figures từ frozen result artifacts bằng một command documented trong repository.
 - Statistical proof:
   - Subject-clustered uncertainty, order/seed handling, leave-one-pair-out sensitivity và raw-`F` sensitivity.
@@ -353,6 +362,14 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
   - Không overwrite manifest/config/result đã dùng trong paper.
   - Final manuscript numbers trace được về immutable run IDs.
 
+Observed implementation proof on 2026-08-13:
+
+- `python3.12 -m py_compile` passed for all source and test modules.
+- `MPLCONFIGDIR=/tmp/eeg-forgetting-matplotlib UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 33 tests passed, including config-lock assertions and a real MNE RawArray filter/resample/channel-order integration test.
+- ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
+- `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
+- `scripts/audit_manifests.py --verify-sources` passed for immutable manifest v1: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source and manifest SHA-256 matched.
+
 ## Result
 
-Chưa hoàn thành. Plan được tạo sau khi scope, novelty positioning và VEP viability đã được chốt. Việc tiếp theo là khóa exact dataset protocols và chạy Week 1 gate.
+Data-loader foundation, ba public raw-data snapshot và immutable split manifest v1 đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là chạy PhysioNet reproduction, kiểm tra preprocessing/dataloader trên split đã khóa và xác nhận TUEV trước deadline truy cập.

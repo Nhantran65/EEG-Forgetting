@@ -1,0 +1,37 @@
+schema_version: 1
+canonical_case: standard_1020
+aliases:
+  FP1: [Fp1, Fp1., EEG-FP1, EEG FP1-REF]
+  FP2: [Fp2, Fp2., EEG-FP2, EEG FP2-REF]
+  FZ: [Fz, Fz., EEG-Fz, EEG FZ-REF]
+  FC3: [Fc3, Fc3., EEG-FC3, EEG FC3-REF]
+  FC1: [Fc1, Fc1., EEG-FC1, EEG FC1-REF]
+  FCZ: [Fcz, Fcz., EEG-FCz, EEG FCZ-REF]
+  FC2: [Fc2, Fc2., EEG-FC2, EEG FC2-REF]
+  FC4: [Fc4, Fc4., EEG-FC4, EEG FC4-REF]
+  C5: [C5., C5.., EEG-C5, EEG C5-REF]
+  C3: [C3., C3.., EEG-C3, EEG C3-REF]
+  C1: [C1., C1.., EEG-C1, EEG C1-REF]
+  CZ: [Cz, Cz., Cz.., EEG-Cz, EEG CZ-REF]
+  C2: [C2., C2.., EEG-C2, EEG C2-REF]
+  C4: [C4., C4.., EEG-C4, EEG C4-REF]
+  C6: [C6., C6.., EEG-C6, EEG C6-REF]
+  CP3: [Cp3, Cp3., EEG-CP3, EEG CP3-REF]
+  CP1: [Cp1, Cp1., EEG-CP1, EEG CP1-REF]
+  CPZ: [Cpz, Cpz., EEG-CPz, EEG CPZ-REF]
+  CP2: [Cp2, Cp2., EEG-CP2, EEG CP2-REF]
+  CP4: [Cp4, Cp4., EEG-CP4, EEG CP4-REF]
+  P1: [P1., P1.., EEG-P1, EEG P1-REF]
+  PZ: [Pz, Pz., Pz.., EEG-Pz, EEG PZ-REF]
+  P2: [P2., P2.., EEG-P2, EEG P2-REF]
+  POZ: [Poz, Poz., EEG-POz, EEG POZ-REF]
+  FPZ-CZ: [Fpz-Cz, EEG Fpz-Cz]
+  PZ-OZ: [Pz-Oz, EEG Pz-Oz]
+montages:
+  bciciv2a_22:
+    [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6,
+     CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  sleep_edf_bipolar: [FPZ-CZ, PZ-OZ]
+  tuev_tcp_16:
+    [FP1-F7, F7-T3, T3-T5, T5-O1, FP2-F8, F8-T4, T4-T6, T6-O2,
+     FP1-F3, F3-C3, C3-P3, P3-O1, FP2-F4, F4-C4, C4-P4, P4-O2]

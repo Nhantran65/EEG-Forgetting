@@ -1,0 +1,24 @@
+schema_version: 1
+target_sampling_rate_hz: 200
+patch_seconds: 1.0
+bandpass_hz: [0.5, 40.0]
+amplitude:
+  source_unit: microvolts
+  divisor: 100.0
+  output_unit: 100_microvolts
+  fit_statistics: false
+training:
+  batch_size: 64
+  budget_matched:
+    optimizer_steps: 2500
+    sample_draws: 160000
+    validation_interval_steps: 100
+    early_stopping: false
+  converged:
+    early_stopping: true
+    monitor: balanced_accuracy
+    restore_best: true
+  bciciv2a_peak_pilot:
+    validation_interval_steps: 100
+    max_steps: 2500
+    persist_validation_curve: true

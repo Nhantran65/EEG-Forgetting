@@ -30,4 +30,4 @@ decision into `docs/decisions/`; keep task-local choices in the plan.
 
 ## Active Plans
 
-No active execution plans are currently indexed.
+- [Diagnostic Catastrophic Forgetting in EEG Foundation Models](active/eeg-forgetting-icassp-2027.md) — ICASSP 2027 experiment and submission plan.

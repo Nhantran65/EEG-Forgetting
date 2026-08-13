@@ -1,0 +1,19 @@
+schema_version: 1
+id: current_vep
+status: quarantined_exploratory
+subjects_usable: 31
+recordings_usable: 59
+windows: 3612
+window_seconds: 1.0
+exclude_from: [main_rq2, continual_learning_matrix, physiological_claims]
+reasons:
+  json_files_with_markers: 0
+  edf_files_with_annotations: 0
+  raw_phase_crossover_window_balanced_accuracy: approximately_chance_0_25
+  label_origin: recording_folder
+preserve:
+  manifest: true
+  pluggable_adapter: true
+  legacy_fold_results: true
+required_followup:
+  audit_subject_disjoint_vs_phase_crossover_contradiction: true

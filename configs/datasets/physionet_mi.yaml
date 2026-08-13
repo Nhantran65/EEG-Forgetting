@@ -1,0 +1,44 @@
+schema_version: 1
+id: physionet_mi
+status: main
+source: EEG Motor Movement/Imagery Database v1.0.0
+subjects_raw: 109
+imagery_runs: [4, 6, 8, 10, 12, 14]
+drop_event: T0
+event_mapping:
+  unilateral_runs:
+    runs: [4, 8, 12]
+    T1: left_fist
+    T2: right_fist
+  bilateral_runs:
+    runs: [6, 10, 14]
+    T1: both_fists
+    T2: both_feet
+classes: [left_fist, right_fist, both_fists, both_feet]
+window_seconds_from_event_onset: [0.0, 4.0]
+channel_montage: bciciv2a_22
+reference: common_average
+exclusions:
+  S088: sampling_rate_128_and_nonstandard_event_count
+  S092: sampling_rate_128_and_nonstandard_event_count
+  S100: sampling_rate_128_and_missing_events
+  S104: truncated_run_08_and_missing_events
+main_split:
+  name: clean_original_ids
+  unit: subject
+  train_ranges: [[1, 70]]
+  validation_ids: [71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89]
+  test_ids: [90, 91, 93, 94, 95, 96, 97, 98, 99, 101, 102, 103, 105, 106, 107, 108, 109]
+  expected_counts: {train: 70, validation: 18, test: 17, total: 105}
+reproduction_split:
+  name: cbramod_original_70_19_20
+  filter_exclusions: false
+  train_ranges: [[1, 70]]
+  validation_ranges: [[71, 89]]
+  test_ranges: [[90, 109]]
+  purpose: one_run_external_pipeline_validation
+assertions:
+  expected_source_sampling_rate_hz: 160
+  expected_annotations_per_run: 30
+  expected_T0_per_run: 15
+  expected_movement_events_per_run: 15

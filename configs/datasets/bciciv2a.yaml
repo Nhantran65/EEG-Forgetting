@@ -1,0 +1,37 @@
+schema_version: 1
+id: bciciv2a
+status: main
+source: BCI Competition IV dataset 2a
+subjects: 9
+classes: [left_hand, right_hand, feet, tongue]
+source_sampling_rate_hz: 250
+channel_montage: bciciv2a_22
+reference: common_average
+drop_eog: true
+sessions: [T, E]
+merge_sessions_within_subject: true
+window_seconds_from_trial_onset: [2.0, 6.0]
+window_interval: half_open
+evaluation_labels:
+  source_pattern: A{subject:02d}E.mat
+  field: classlabel
+  never_read_class_from_evaluation_gdf: true
+artifact_trials: exclude
+split:
+  unit: subject
+  main:
+    name: fixed_subject_holdout_v1
+    train: [A01, A02, A03, A04, A05]
+    validation: [A06, A07]
+    test: [A08, A09]
+  robustness:
+    status: pending_predeclared_split
+  no_subject_overlap: true
+assertions:
+  sessions_per_subject: 2
+  mi_runs_per_session: 6
+  trials_before_artifact_exclusion: 288
+  classes_per_session: 4
+  trials_per_class_before_artifact_exclusion: 72
+  detect_eog_blocks_by_empty_labels: true
+  known_short_eog_calibration_session: A04T

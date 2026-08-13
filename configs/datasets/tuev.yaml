@@ -1,0 +1,37 @@
+schema_version: 1
+id: tuev
+status: access_pending_main_candidate
+source: TUH EEG Events v2.0.0
+access_deadline: 2026-08-19
+fallback_if_unavailable: continue_with_three_tasks_and_weaken_claim
+preprocessing_authority:
+  repository: https://github.com/wjq-learning/CBraMod
+  commit: b9e961003214326972c567eff390e75b0287e32a
+  script: preprocessing/preprocessing_tuev.py
+  do_not_reimplement: true
+preprocessing_modes:
+  reference_reproduction:
+    raw_bandpass_hz: [0.3, 75.0]
+    notch_hz: 60
+    modify_pinned_script: false
+    purpose: compare_with_cbramod_reference
+  main_harmonized:
+    raw_bandpass_hz: [0.5, 40.0]
+    notch_hz: null
+    modification: filter_parameters_only_before_event_extraction
+    purpose: shared_rq2_and_continual_learning_pipeline
+normalization:
+  upstream_pickle_unit: microvolts
+  loader_divisor: 100.0
+input_reference_channels: 23
+output_montage: tuev_tcp_16
+output_bipolar_channels: 16
+event_window_seconds: 5
+classes: 6
+class_imbalance: severe
+metrics: [balanced_accuracy, macro_f1]
+assertions:
+  sample_shape: [16, 5, 200]
+  deterministic_subject_split: true
+  forbid_window_level_refiltering: true
+  expected_version_2_0_0_counts: {train: 67436, validation: 15634, test: 29421}

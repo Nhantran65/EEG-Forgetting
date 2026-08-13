@@ -1,0 +1,37 @@
+schema_version: 1
+id: sleep_edf_sc
+status: main
+source: Sleep-EDF Expanded v1.0.0 Sleep Cassette
+cohort: sleep_cassette
+subjects_expected: 78
+recordings_expected: 153
+source_sampling_rate_hz: 100
+channels: [Fpz-Cz, Pz-Oz]
+channel_montage: sleep_edf_bipolar
+reference: already_bipolar_no_car
+epoch_seconds: 30
+stage_mapping:
+  Sleep stage W: wake
+  Sleep stage 1: n1
+  Sleep stage 2: n2
+  Sleep stage 3: n3
+  Sleep stage 4: n3
+  Sleep stage R: rem
+drop_stages: ["Sleep stage ?", Movement time]
+wake_crop_minutes: 30
+split:
+  unit: subject
+  group_all_nights: true
+  target_subject_counts: {train: 48, validation: 15, test: 15}
+  stratify_fields: [age, sex]
+  age_bands:
+    young: [25, 39]
+    middle: [40, 64]
+    older: [65, 79]
+    oldest: [80, null]
+  seed: 20260813
+assertions:
+  no_subject_overlap: true
+  preserve_recording_within_subject: true
+  report_subject_and_recording_counts: true
+  expected_classes: [wake, n1, n2, n3, rem]

@@ -9,6 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# Local datasets and generated experiment artifacts
+/data/
+/artifacts/
+/checkpoints/
+/results/
+
 # Harness core maintenance binary
 scripts/bin/harness
 scripts/bin/harness.exe
