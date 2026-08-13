@@ -1,0 +1,28 @@
+schema_version: 1
+id: cbramod_base
+upstream:
+  repository: https://github.com/wjq-learning/CBraMod
+  commit: b9e961003214326972c567eff390e75b0287e32a
+  code_license: MIT
+checkpoint:
+  repository: https://huggingface.co/weighting666/CBraMod
+  revision: 500543c7e30bda1b22bfd51a49301b238dee21fd
+  repository_license: Apache-2.0
+  filename: pretrained_weights.pth
+  local_path: checkpoints/cbramod/pretrained_weights.pth
+  bytes: 19775842
+  sha256: 0792cb808c14e6b7a2bb2ce1dff379bc47bc54c49a779825bdfeb33bf8157178
+  load_mode: torch_weights_only_strict
+architecture:
+  patch_points: 200
+  embedding_dim: 200
+  feedforward_dim: 800
+  encoder_layers: 12
+  attention_heads: 8
+  pretrained_projection_dim: 200
+  variable_channel_count: true
+  variable_patch_count: true
+integration_probe:
+  head: mean_pool_linear
+  purpose: forward_backward_and_linear_probe_only
+  main_experiment_head_locked: false

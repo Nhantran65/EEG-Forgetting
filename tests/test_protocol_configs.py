@@ -61,3 +61,18 @@ def test_tuev_contract_uses_pinned_16_channel_output() -> None:
         40.0,
     ]
     assert config["normalization"]["loader_divisor"] == 100.0
+
+
+def test_cbramod_code_and_checkpoint_identity_are_pinned() -> None:
+    config = load_yaml(ROOT / "configs" / "models" / "cbramod.yaml")
+    assert config["upstream"]["commit"] == (
+        "b9e961003214326972c567eff390e75b0287e32a"
+    )
+    assert config["checkpoint"]["revision"] == (
+        "500543c7e30bda1b22bfd51a49301b238dee21fd"
+    )
+    assert config["checkpoint"]["sha256"] == (
+        "0792cb808c14e6b7a2bb2ce1dff379bc47bc54c49a779825bdfeb33bf8157178"
+    )
+    assert config["checkpoint"]["load_mode"] == "torch_weights_only_strict"
+    assert config["integration_probe"]["main_experiment_head_locked"] is False

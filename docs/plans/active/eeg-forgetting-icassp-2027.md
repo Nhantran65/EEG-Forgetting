@@ -319,6 +319,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Tải, checksum và source-audit ba dataset công khai đã khóa.
 - [x] Tạo immutable dataset/split manifests.
 - [x] Nối raw loaders với frozen manifests và pass real-data preprocessing smoke test cho ba task.
+- [x] Pin CBraMod code/checkpoint, xác nhận variable shape và pass real-batch GPU forward/loss/backward cho ba task.
 - [ ] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
@@ -339,6 +340,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Freeze manifest v1: BCI main A01–A05/A06–A07/A08–A09; Sleep stratify `age-band x sex` với seed 20260813; PhysioNet giữ cả clean split và reproduction split trong cùng subject manifest.
 - 2026-08-13: Real BCI smoke phát hiện MNE xuất 17 channel label trống thành `EEG-0`…`EEG-16`; registry map chúng theo thứ tự montage chính thức. Manifest v3 supersede v1/v2 và freeze thêm `channels.yaml` cùng `common.yaml`.
 - 2026-08-13: Mọi training data access đi qua `FrozenManifestSet` + `ManifestEEGLoader`; runtime verify manifest/config digest, source size, split và sample shape. Full raw SHA-256 được audit riêng trước run.
+- 2026-08-13: Pin CBraMod code `b9e961...` và official checkpoint revision `500543c...`/SHA-256 `0792cb8...`; strict weights-only load và upstream numerical parity là pre-run requirements.
+- 2026-08-13: Backbone xử lý trực tiếp 2/16/22 channel và 4/5/30 patch, không cần pad-and-mask. Mean-pool linear head hiện chỉ dùng cho integration/linear-probe diagnostic; main experiment head chưa khóa.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -368,12 +371,13 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `MPLCONFIGDIR=/tmp/eeg-forgetting-matplotlib UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 38 tests passed, including manifest/config tamper checks and a real MNE RawArray filter/resample/channel-order integration test.
+- `MPLCONFIGDIR=/tmp/eeg-forgetting-matplotlib UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 44 tests passed, including manifest/config tamper checks, CBraMod identity/variable-shape/depth checks, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.
 - Real preprocessing smoke through manifest v3 passed on A01E (281 non-artifact trials, 4 classes, `22x4x200`), S001R04 (15 trials, `22x4x200`), and SC00 night 1 (841 epochs, 5 stages, `2x30x200`); every signal was finite `float32` in CBraMod units.
+- CBraMod adapter strict-loaded all 211 checkpoint tensors (4,924,000 parameters) and matched pinned upstream output exactly (`max_abs_diff=0.0`). On one L40S with PyTorch 2.13.0+cu130, real batch-size-2 forward/loss/backward passed for BCI, PhysioNet and Sleep with finite non-zero last-block gradients.
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest v3 và manifest-backed real preprocessing đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là chạy PhysioNet reproduction, chuẩn bị model/checkpoint integration và xác nhận TUEV trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest v3, pretrained CBraMod adapter và real GPU backward proof đã hoàn thành. Plan tổng thể vẫn active: việc tiếp theo là khóa classifier head/plasticity pilot, chạy linear probe + single-task baselines và PhysioNet reproduction, đồng thời xác nhận TUEV trước deadline truy cập.

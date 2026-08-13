@@ -53,3 +53,19 @@ channel registry and shared preprocessing config used by the manifest-backed
 loader. To materialize a later version from a new audited snapshot, pass an
 explicit new output directory to `scripts/build_manifests.py`; the builder
 refuses to overwrite an existing set.
+
+## CBraMod integration
+
+The model adapter is pinned to official CBraMod code commit
+`b9e961003214326972c567eff390e75b0287e32a`. Download and verify the official
+checkpoint, then run the real-batch GPU proof:
+
+```bash
+uv run python scripts/download_cbramod_checkpoint.py
+CUDA_VISIBLE_DEVICES=0 uv run python scripts/smoke_test_cbramod_gpu.py
+```
+
+The checkpoint lives under ignored `checkpoints/`; its revision, byte count and
+SHA-256 are locked in `configs/models/cbramod.yaml`. The current project lock
+uses the PyTorch CUDA 13.0 wheel. The smoke script requires an environment that
+exposes NVIDIA devices; unit tests remain CPU-compatible.
