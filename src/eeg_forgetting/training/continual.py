@@ -82,6 +82,17 @@ class MultiHeadCBraMod(nn.Module):
             layer.train()
         return [parameter for parameter in self.parameters() if parameter.requires_grad]
 
+    def prepare_joint(self, *, depth: int) -> list[nn.Parameter]:
+        self.eval()
+        self.backbone.set_trainable_depth(depth)
+        for head in self.heads.values():
+            for parameter in head.parameters():
+                parameter.requires_grad = True
+            head.train()
+        for layer in self.backbone.encoder.layers[-depth:]:
+            layer.train()
+        return [parameter for parameter in self.parameters() if parameter.requires_grad]
+
 
 @torch.no_grad()
 def evaluate_task(

@@ -1,6 +1,7 @@
 import pytest
 
 from eeg_forgetting.training.continual import aggregate_replicates, pairwise_forgetting
+from eeg_forgetting.training.joint import joint_task_schedule
 
 
 def _stage(**task_values: float) -> dict[str, object]:
@@ -50,3 +51,17 @@ def test_sequential_summary_reports_seed_spread_and_signs() -> None:
     assert summary["mean"] == pytest.approx(0.2 / 3)
     assert summary["positive_fraction"] == pytest.approx(2 / 3)
     assert summary["negative_fraction"] == pytest.approx(1 / 3)
+
+
+def test_joint_schedule_is_task_balanced_and_canonical() -> None:
+    schedule = joint_task_schedule(3)
+    assert schedule == (
+        "bciciv2a",
+        "physionet_mi",
+        "sleep_edf_sc",
+    ) * 3
+    assert {task: schedule.count(task) for task in set(schedule)} == {
+        "bciciv2a": 3,
+        "physionet_mi": 3,
+        "sleep_edf_sc": 3,
+    }

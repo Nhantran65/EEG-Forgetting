@@ -44,8 +44,12 @@ forgetting:
   minimum_valid_headroom_above_chance: 0.05
   invalid_action: retain_raw_and_flag_relative_null_without_clipping
 analysis_gate:
-  compare_direction_sign_to_main: true
-  fail_if_all_bci_involving_directions_reverse: true
+  minimum_valid_replicates_per_direction: 3
+  signal_definition: absolute_mean_relative_forgetting_exceeds_sample_sd
+  minimum_signal_directions: 4
+  minimum_same_sign_fraction_per_direction: 0.6666666666666666
+  robustness_compare_direction_sign_to_main: true
+  robustness_fail_if_all_bci_involving_directions_reverse: true
 recovery:
   checkpoint_after_each_task: true
   resume_only_from_digest_verified_complete_stage: true
