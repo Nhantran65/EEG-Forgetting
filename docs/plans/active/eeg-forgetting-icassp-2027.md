@@ -338,6 +338,15 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [ ] Chạy BCI robustness fold v2 cho Sequential FT, giữ nguyên mọi hyperparameter.
 - [ ] Chạy task-balanced joint-training upper bound ba seed.
 - [ ] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
+
+### Follow-up execution queue — 2026-08-14
+
+- `eeg-followup-gpu0`: đang chạy chín pairwise run còn thiếu, sau đó tự chạy chín BCI robustness runs trên physical GPU 0.
+- `eeg-joint-gpu2`: đang chạy joint upper bound ba seed trên physical GPU 2; đúng 2.500 update mỗi task theo round-robin, tổng 7.500 update mỗi seed.
+- `eeg-followup-summary`: tự chờ và tạo path-free, robustness và joint summaries với digest verification.
+- `eeg-intervention-gpu2`: tự chờ joint seed cuối, sau đó chạy ma trận 36 BCI→Sleep intervention trên physical GPU 2 và tự tổng hợp claim gate.
+- BCI robustness fold v2 giữ A03–A07 train, A08–A09 validation, A01–A02 test; không retune.
+- Intervention xếp hạng theo geometric mean của Fisher đã L2-normalize trong từng encoder layer. Mỗi tỷ lệ 1/5/10% dùng một high-overlap mask và ba random mask cùng số phần tử ở từng layer, chia sẻ mask qua ba training seed. Sau mỗi AdamW step, phần tử frozen được khôi phục chính xác về anchor để triệt cả decoupled weight decay.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
