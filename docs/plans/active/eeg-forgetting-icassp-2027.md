@@ -328,9 +328,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn tất one-off PhysioNet upstream reproduction 64-channel/50-epoch.
 - [x] Chạy converged single-task baseline với early stopping đã khóa trên ba task.
 - [x] Chạy exact per-example Fisher instrument pilot và pass split-half/cross-task gate.
-- [ ] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints (đang chạy trong `eeg-cl-forward` trên GPU 0 và `eeg-cl-reverse` trên GPU 2).
-- [ ] Chạy main sequential FT matrix 3 order × 3 seed và stability gate trước EWC/DER++ (đang chạy qua đêm: `eeg-cl-main-gpu0` 5 run, `eeg-cl-main-gpu2` 4 run; `eeg-cl-main-summary` tự verify/tổng hợp).
-- [ ] Hoàn thành Week 1 gate.
+- [x] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints.
+- [x] Chạy main sequential FT matrix 3 order × 3 seed và pass stability gate trước EWC/DER++.
+- [x] Hoàn thành Week 1 gate.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
@@ -366,6 +366,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Fisher instrument gate pass: split-half cosine BCI/PhysioNet/Sleep = 0,9957/0,9655/0,9873; cross-task cosine BCI–PhysioNet/BCI–Sleep/PhysioNet–Sleep = 0,8277/0,5672/0,5871. Minimum within-task 0,9655 vượt threshold 0,90 và margin trên maximum cross-task = 0,1378 vượt threshold 0,05. Không cần escalation 2.048 mẫu.
 - 2026-08-13: Sequential FT smoke khóa hai order forward `BCI→PhysioNet→Sleep` và reverse để phủ hai chiều mọi cặp ở seed 3407. Mỗi task nhận đúng 2.500 step, optimizer reset, head được preinitialize theo canonical order để không phụ thuộc task order, head cũ freeze, final-4 backbone tiếp tục plastic. Đánh giá trên frozen test subjects sau mỗi stage; `F_rel` chỉ hợp lệ khi before-score cao hơn chance ít nhất 0,05 và không bao giờ clip.
 - 2026-08-14: Main sequential FT khóa seeds 3407/42/2026 và order thứ ba challenging `PhysioNet→BCI→Sleep`, tạo ma trận 9 run. Stability gate yêu cầu đủ ít nhất ba replicate hợp lệ cho sáu direction; ít nhất bốn direction phải có `|mean F_rel| > sample SD` và ít nhất 2/3 replicate cùng dấu. Chỉ sau gate này mới scale EWC/DER++.
+- 2026-08-14: Cả 9/9 sequential run hoàn tất và stability gate pass: đủ replicate, 6/6 direction vượt signal rule và 6/6 nhất quán dấu. Năm direction có forgetting dương; `BCI←PhysioNet` có backward transfer nhất quán (`mean F_rel=-0,2351`). Ba unordered pair cho Fisher cosine 0,8277/0,5672/0,5871 và mean `F_rel` 0,0193/0,3724/0,3262; Spearman `rho=-1` chỉ là exploratory vì `n=3`, không được diễn giải confirmatory.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -403,7 +404,8 @@ Observed implementation proof on 2026-08-13:
 - CBraMod adapter strict-loaded all 211 checkpoint tensors (4,924,000 parameters) and matched pinned upstream output exactly (`max_abs_diff=0.0`). On one L40S with PyTorch 2.13.0+cu130, real batch-size-2 forward/loss/backward passed for BCI, PhysioNet and Sleep with finite non-zero last-block gradients.
 - PhysioNet reproduction cache matched the pinned upstream preprocessing exactly on S001R04 (`15x64x4x200`, `max_abs_diff=0.0`), contained the same 9.837 examples across 70/19/20 subjects, and reproduced the upstream classifier initialization bit-for-bit. The completed 50-epoch run selected epoch 33 and produced test BA 0,6229, kappa 0,4972 and weighted-F1 0,6241; checkpoint/config digests re-verified after the run.
 - Frozen test caches were materialized and bound to manifest v3: BCI 1.036 samples/2 subjects, PhysioNet 1.530/17 and Sleep 37.227/15. Full source-checksum manifest audit passed immediately before launching sequential FT.
+- Sequential FT completed 9/9 immutable runs (three orders × three seeds). The predeclared stability gate passed with six signal-bearing and six sign-consistent directed transitions; the summary binds every input result by SHA-256.
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction và Fisher instrument gate đã hoàn thành. Forward/reverse sequential FT smoke đang chạy trên GPU 0/2. TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction, Fisher instrument gate và full sequential FT matrix đã hoàn thành. Week 1 gate pass; Week 2 chuyển sang validation-selected EWC/DER++ pilot trước khi scale full matrix. TUEV vẫn cần xác nhận trước deadline truy cập.
