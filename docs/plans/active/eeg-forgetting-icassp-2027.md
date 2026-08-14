@@ -331,6 +331,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints.
 - [x] Chạy main sequential FT matrix 3 order × 3 seed và pass stability gate trước EWC/DER++.
 - [x] Hoàn thành Week 1 gate.
+- [ ] Chạy validation pilot BCI→Sleep để khóa một EWC strength và một DER++ byte cap trước full matrix.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
@@ -367,6 +368,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Sequential FT smoke khóa hai order forward `BCI→PhysioNet→Sleep` và reverse để phủ hai chiều mọi cặp ở seed 3407. Mỗi task nhận đúng 2.500 step, optimizer reset, head được preinitialize theo canonical order để không phụ thuộc task order, head cũ freeze, final-4 backbone tiếp tục plastic. Đánh giá trên frozen test subjects sau mỗi stage; `F_rel` chỉ hợp lệ khi before-score cao hơn chance ít nhất 0,05 và không bao giờ clip.
 - 2026-08-14: Main sequential FT khóa seeds 3407/42/2026 và order thứ ba challenging `PhysioNet→BCI→Sleep`, tạo ma trận 9 run. Stability gate yêu cầu đủ ít nhất ba replicate hợp lệ cho sáu direction; ít nhất bốn direction phải có `|mean F_rel| > sample SD` và ít nhất 2/3 replicate cùng dấu. Chỉ sau gate này mới scale EWC/DER++.
 - 2026-08-14: Cả 9/9 sequential run hoàn tất và stability gate pass: đủ replicate, 6/6 direction vượt signal rule và 6/6 nhất quán dấu. Năm direction có forgetting dương; `BCI←PhysioNet` có backward transfer nhất quán (`mean F_rel=-0,2351`). Ba unordered pair cho Fisher cosine 0,8277/0,5672/0,5871 và mean `F_rel` 0,0193/0,3724/0,3262; Spearman `rho=-1` chỉ là exploratory vì `n=3`, không được diễn giải confirmatory.
+- 2026-08-14: Method-selection pilot khóa trước cặp `BCI→Sleep`, seed 3407 và chỉ đọc validation. EWC thử `lambda=0/1.000/10.000/100.000`; DER++ thử cap `0/8/16/32 MiB`, Algorithm R với slot cố định tính đủ signal/label/logit/task metadata, hai replay draw độc lập và `alpha=beta=0,5` theo bài gốc. Candidate hợp lệ phải giữ Sleep validation BA không thấp hơn baseline quá 0,02; trong tập hợp lệ chọn `F_rel` của BCI thấp nhất, hòa thì chọn strength/bytes thấp hơn. Sau selection khóa một giá trị cho mọi order/seed, không tune lại.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -396,7 +398,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 Observed implementation proof on 2026-08-13:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
-- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 73 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance/replicate-summary rules, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
+- `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 78 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance/replicate-summary rules, EWC penalty math, byte-capped reservoir accounting/state, method-selection constraints, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
 - ZIP CRC passed for both BCI archives; PhysioNet and Sleep-EDF downloaded-file SHA-256 checks passed against official `SHA256SUMS.txt`.
 - `scripts/audit_downloaded_data.py` observed 18 valid BCI GDF sessions, 109 x 6 PhysioNet imagery runs with explicit clean exclusions, and 153 paired Sleep recordings across 78 subjects.
 - `scripts/audit_manifests.py --verify-sources` passed for active immutable manifest v3: BCI 5/2/2 subjects, PhysioNet clean 70/18/17 plus 4 explicit exclusions, and Sleep 48/15/15 subjects with 94/30/29 recordings. Every source, config, and manifest SHA-256 matched.

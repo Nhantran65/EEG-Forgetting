@@ -1,0 +1,52 @@
+schema_version: 1
+id: continual_method_selection_v1
+status: locked_pilot
+seed: 3407
+pair: [bciciv2a, sleep_edf_sc]
+model:
+  head: flatten_mlp
+  plastic_final_encoder_blocks: 4
+training:
+  train_split: train
+  evaluation_split: validation
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  optimizer_reset_each_task: true
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+ewc:
+  formulation: half_lambda_sum_fisher_times_squared_parameter_drift
+  strength_candidates: [0, 1000, 10000, 100000]
+  fisher_scope: final_four_shared_backbone_blocks
+  fisher_estimator: observed_label_exact_per_example_1024_natural_train_samples
+  stage_one_checkpoint: results/continual/sequential_ft_v1/forward/seed-3407/stage-01-bciciv2a/checkpoint.pt
+  stage_one_checkpoint_sha256: 76bf53c4a650d86d1703ecfa194ad44d4bf7826345cc78095a00633f0826d9b8
+  fisher_path: results/fisher/instrument_v1/bciciv2a/seed-3407/full.pt
+  fisher_sha256: 0862efbdf7579ffceb1e8eea8bb1158132ad8165850036056e7f5567a72e18fb
+derpp:
+  alpha: 0.5
+  beta: 0.5
+  replay_batch_size: 64
+  byte_cap_candidates_mib: [0, 8, 16, 32]
+  reservoir_policy: algorithm_r_uniform_over_stream
+  storage: fixed_slots_padded_to_largest_locked_task
+  account_fields: [float32_signal, int64_label, float32_logits, int8_task_id, int64_size, int64_seen]
+  two_independent_replay_draws: true
+selection:
+  baseline_candidate: 0
+  maximum_absolute_new_task_validation_drop: 0.02
+  primary: minimum_old_task_relative_forgetting_among_plasticity_eligible_candidates
+  tie_break: lower_method_strength_or_memory
+  minimum_valid_headroom_above_chance: 0.05
+  test_split_forbidden: true
+references:
+  ewc: https://doi.org/10.1073/pnas.1611835114
+  derpp: https://proceedings.neurips.cc/paper/2020/hash/b704ea2c39778f07c617f6b7ce480e9e-Abstract.html
+purpose: select_one_ewc_strength_and_one_derpp_byte_cap_before_full_matrix
