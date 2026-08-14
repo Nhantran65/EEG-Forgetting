@@ -1,0 +1,59 @@
+schema_version: 1
+id: physionet_bci_overlap_intervention_v1
+status: locked_intervention
+method: parameter_freeze_intervention
+seeds: [3407, 42, 2026]
+old_task: physionet_mi
+new_task: bciciv2a
+source_stage:
+  role: exact_2500_step_physionet_only_checkpoint
+  path_pattern: results/continual/sequential_ft_v1/challenging/seed-{seed}/stage-01-physionet_mi/checkpoint.pt
+  sha256_by_seed:
+    3407: e19af2c3e196cb85f71e5fb6138bde16cfea0fc3d0d4754f5a263b2d04133e3b
+    42: 08631c825a4766c39f7c7c69847dbf666bb70fbde7c2f0c6856c294a7664f656
+    2026: b97eb63506849401259cf675161dcea8c1f010b522bd5c1b7fe989a386c57ab2
+fisher:
+  tasks:
+    physionet_mi:
+      path: results/fisher/instrument_v1/physionet_mi/seed-3407/full.pt
+      sha256: 96c1f3d9fa231538cd0a3b6e55567328373c75a03b5f06eda19aa5d703d49e73
+    bciciv2a:
+      path: results/fisher/instrument_v1/bciciv2a/seed-3407/full.pt
+      sha256: 0862efbdf7579ffceb1e8eea8bb1158132ad8165850036056e7f5567a72e18fb
+  normalization: l2_within_encoder_layer
+  joint_importance_score: elementwise_geometric_mean
+mask:
+  freeze_ratios: [0.05, 0.10]
+  selection_scope: independently_within_each_encoder_layer
+  high_overlap: top_score_elements
+  random_controls_per_ratio: 3
+  random_seed_base: 20260815
+  random_masks_shared_across_training_seeds: true
+  random_control: same_frozen_count_in_every_layer
+  optimizer_safety: zero_gradient_then_restore_exact_anchor_after_adamw_step
+model:
+  head: flatten_mlp
+  plastic_final_encoder_blocks: 4
+training:
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+evaluation:
+  splits: [validation, test]
+  primary: mean_subject_balanced_accuracy
+  matched_new_task_tolerance_absolute: 0.02
+  minimum_valid_headroom_above_chance: 0.05
+claim_gate:
+  unit: freeze_ratio_aggregated_across_training_seed
+  matched_if_absolute_new_task_ba_difference_vs_random_mean_at_most: 0.02
+  protected_if_old_task_relative_forgetting_below_random_mean: true
+  minimum_matched_and_protected_ratios: 2
+purpose: second_pair_causal_replication_of_fisher_parameter_localization

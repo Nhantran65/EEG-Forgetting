@@ -26,6 +26,12 @@ def parse_args() -> argparse.Namespace:
         / "bci_sleep_overlap_intervention_v1.yaml",
     )
     parser.add_argument("--output-root", type=Path)
+    parser.add_argument(
+        "--ratios",
+        type=float,
+        nargs="+",
+        help="Optional declared ratio subset for splitting the matrix across devices.",
+    )
     return parser.parse_args()
 
 
@@ -39,7 +45,11 @@ def main() -> None:
         f"random_{index}"
         for index in range(int(config["mask"]["random_controls_per_ratio"]))
     ]
-    for ratio in config["mask"]["freeze_ratios"]:
+    declared_ratios = tuple(float(value) for value in config["mask"]["freeze_ratios"])
+    ratios = declared_ratios if args.ratios is None else tuple(args.ratios)
+    if not ratios or any(float(value) not in declared_ratios for value in ratios):
+        raise ValueError("--ratios must be a non-empty subset declared by the config")
+    for ratio in ratios:
         for condition in conditions:
             for seed in config["seeds"]:
                 result = (

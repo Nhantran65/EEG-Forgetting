@@ -347,6 +347,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - `eeg-intervention-gpu2`: tự chờ joint seed cuối, sau đó chạy ma trận 36 BCI→Sleep intervention trên physical GPU 2 và tự tổng hợp claim gate.
 - BCI robustness fold v2 giữ A03–A07 train, A08–A09 validation, A01–A02 test; không retune.
 - Intervention xếp hạng theo geometric mean của Fisher đã L2-normalize trong từng encoder layer. Mỗi tỷ lệ 1/5/10% dùng một high-overlap mask và ba random mask cùng số phần tử ở từng layer, chia sẻ mask qua ba training seed. Sau mỗi AdamW step, phần tử frozen được khôi phục chính xác về anchor để triệt cả decoupled weight decay.
+- Follow-up localization replication dùng hướng `physionet_mi → bciciv2a`, tỷ lệ 5/10%, ba matched random mask và ba seed (24 run). Hai tỷ lệ đều phải pass matched-plasticity/protection gate; không dùng lại mức 1% yếu trên validation của cặp đầu.
+- Directional audit chạy đủ sáu transition × ba seed tại checkpoint old-task. Mỗi task dùng cố định 1.024 mẫu train để đo signed mean observed-label NLL gradient trên bốn encoder block plastic. Báo negative gradient cosine như conflict score, cùng exact post-training parameter drift được weighted bởi old-task Fisher và geometric-mean shared Fisher.
+- Directional audit chỉ mang vai trò descriptive/mechanistic vì có sáu transition; không dùng p-value hoặc claim predictor tổng quát từ sáu điểm này.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.

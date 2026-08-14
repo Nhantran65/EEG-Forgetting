@@ -45,6 +45,8 @@ def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
     config_sha = sha256_file(args.config)
+    old_task = str(config["old_task"])
+    new_task = str(config["new_task"])
     root = args.result_root or (
         PROJECT_ROOT / "results" / "interventions" / str(config["id"])
     )
@@ -93,14 +95,14 @@ def main() -> None:
                     relative = result["forgetting"][split]["relative_forgetting"]
                     if relative is None:
                         raise DatasetProtocolError(
-                            f"invalid BCI forgetting headroom in {path}"
+                            f"invalid {old_task} forgetting headroom in {path}"
                         )
-                    values[(ratio, condition, split, "bci_relative_forgetting")].append(
+                    values[(ratio, condition, split, "old_relative_forgetting")].append(
                         float(relative)
                     )
-                    values[(ratio, condition, split, "sleep_subject_ba")].append(
+                    values[(ratio, condition, split, "new_subject_ba")].append(
                         float(
-                            result["evaluations"][split]["sleep_edf_sc"][
+                            result["evaluations"][split][new_task][
                                 "mean_subject_balanced_accuracy"
                             ]
                         )
@@ -119,42 +121,42 @@ def main() -> None:
     for ratio in ratios:
         split_results = {}
         for split in ("validation", "test"):
-            high_sleep = values[(ratio, "high_overlap", split, "sleep_subject_ba")]
-            random_sleep = sum(
+            high_new = values[(ratio, "high_overlap", split, "new_subject_ba")]
+            random_new = sum(
                 (
-                    values[(ratio, condition, split, "sleep_subject_ba")]
+                    values[(ratio, condition, split, "new_subject_ba")]
                     for condition in conditions[1:]
                 ),
                 [],
             )
             high_forgetting = values[
-                (ratio, "high_overlap", split, "bci_relative_forgetting")
+                (ratio, "high_overlap", split, "old_relative_forgetting")
             ]
             random_forgetting = sum(
                 (
                     values[
-                        (ratio, condition, split, "bci_relative_forgetting")
+                        (ratio, condition, split, "old_relative_forgetting")
                     ]
                     for condition in conditions[1:]
                 ),
                 [],
             )
-            sleep_difference = statistics.mean(high_sleep) - statistics.mean(random_sleep)
+            new_difference = statistics.mean(high_new) - statistics.mean(random_new)
             forgetting_difference = statistics.mean(high_forgetting) - statistics.mean(
                 random_forgetting
             )
             split_results[split] = {
                 "high_overlap": {
-                    "sleep_subject_ba": _stats(high_sleep),
-                    "bci_relative_forgetting": _stats(high_forgetting),
+                    "new_task_subject_ba": _stats(high_new),
+                    "old_task_relative_forgetting": _stats(high_forgetting),
                 },
                 "random_controls_pooled": {
-                    "sleep_subject_ba": _stats(random_sleep),
-                    "bci_relative_forgetting": _stats(random_forgetting),
+                    "new_task_subject_ba": _stats(random_new),
+                    "old_task_relative_forgetting": _stats(random_forgetting),
                 },
-                "high_minus_random_sleep_subject_ba": sleep_difference,
-                "high_minus_random_bci_relative_forgetting": forgetting_difference,
-                "new_task_performance_matched": abs(sleep_difference) <= tolerance,
+                "high_minus_random_new_task_subject_ba": new_difference,
+                "high_minus_random_old_task_relative_forgetting": forgetting_difference,
+                "new_task_performance_matched": abs(new_difference) <= tolerance,
                 "old_task_better_protected": forgetting_difference < 0.0,
             }
         test_gate = split_results["test"]
@@ -175,6 +177,8 @@ def main() -> None:
     summary = {
         "schema_version": 1,
         "run": config["id"],
+        "old_task": old_task,
+        "new_task": new_task,
         "config_sha256": config_sha,
         "input_result_sha256": inputs,
         "ratios": ratio_results,

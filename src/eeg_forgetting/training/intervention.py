@@ -19,7 +19,7 @@ from eeg_forgetting.models.cbramod import load_pretrained_backbone
 from .continual import MultiHeadCBraMod, _atomic_npz, evaluate_task
 from .continual_methods import _atomic_json, _atomic_torch, _optimizer_and_loader
 from .fisher import encoder_layer_key, layer_l2_normalize, load_fisher
-from .pilot import set_determinism
+from .pilot import TASK_CLASSES, set_determinism
 
 
 def _layer_parameter_names(values: Mapping[str, Tensor]) -> dict[str, list[str]]:
@@ -113,8 +113,14 @@ def restore_frozen_parameters(
             parameter[mask] = anchor[mask]
 
 
-def _forgetting(before: float, after: float, *, minimum_headroom: float) -> dict[str, object]:
-    chance = 0.25
+def _forgetting(
+    before: float,
+    after: float,
+    *,
+    classes: int,
+    minimum_headroom: float,
+) -> dict[str, object]:
+    chance = 1.0 / classes
     headroom = before - chance
     valid = headroom >= minimum_headroom
     raw = before - after
@@ -164,13 +170,30 @@ def run_overlap_freeze_intervention(
     expected_source = str(config["source_stage"]["sha256_by_seed"][int(seed)])
     if sha256_file(source_path) != expected_source:
         raise DatasetProtocolError("intervention source checkpoint digest mismatch")
+    old_task = str(config["old_task"])
+    new_task = str(config["new_task"])
+    if old_task == new_task or old_task not in TASK_CLASSES or new_task not in TASK_CLASSES:
+        raise DatasetProtocolError("intervention must declare two distinct known tasks")
     fisher_config = config["fisher"]
-    left_path = Path(str(fisher_config["bciciv2a_path"]))
-    right_path = Path(str(fisher_config["sleep_edf_sc_path"]))
-    if sha256_file(left_path) != fisher_config["bciciv2a_sha256"]:
-        raise DatasetProtocolError("BCI intervention Fisher digest mismatch")
-    if sha256_file(right_path) != fisher_config["sleep_edf_sc_sha256"]:
-        raise DatasetProtocolError("Sleep intervention Fisher digest mismatch")
+    if "tasks" in fisher_config:
+        task_fishers = fisher_config["tasks"]
+        left_path = Path(str(task_fishers[old_task]["path"]))
+        right_path = Path(str(task_fishers[new_task]["path"]))
+        expected_fisher = {
+            old_task: str(task_fishers[old_task]["sha256"]),
+            new_task: str(task_fishers[new_task]["sha256"]),
+        }
+    else:
+        # Backward-compatible reader for the already completed BCI-to-Sleep config.
+        left_path = Path(str(fisher_config[f"{old_task}_path"]))
+        right_path = Path(str(fisher_config[f"{new_task}_path"]))
+        expected_fisher = {
+            old_task: str(fisher_config[f"{old_task}_sha256"]),
+            new_task: str(fisher_config[f"{new_task}_sha256"]),
+        }
+    for task, path in ((old_task, left_path), (new_task, right_path)):
+        if sha256_file(path) != expected_fisher[task]:
+            raise DatasetProtocolError(f"{task} intervention Fisher digest mismatch")
     ratio_index = ratios.index(float(ratio))
     random_index = 0 if condition == "high_overlap" else int(condition.split("_")[1])
     mask_seed = int(config["mask"]["random_seed_base"]) + 100 * ratio_index + random_index
@@ -186,11 +209,11 @@ def run_overlap_freeze_intervention(
     device = torch.device(device)
     torch.cuda.set_device(device)
     cache_root = Path(cache_root)
-    train_data = CachedEEGDataset(cache_root / "sleep_edf_sc" / "train" / "index.json")
+    train_data = CachedEEGDataset(cache_root / new_task / "train" / "index.json")
     evaluation_sets = {
         split: {
             task: CachedEEGDataset(cache_root / task / split / "index.json")
-            for task in ("bciciv2a", "sleep_edf_sc")
+            for task in (old_task, new_task)
         }
         for split in ("validation", "test")
     }
@@ -216,12 +239,12 @@ def run_overlap_freeze_intervention(
     before = {}
     for split in ("validation", "test"):
         metrics, _arrays = evaluate_task(
-            model, "bciciv2a", evaluation_loaders[split]["bciciv2a"], device=device
+            model, old_task, evaluation_loaders[split][old_task], device=device
         )
         before[split] = metrics
 
     trainable, optimizer, scheduler, loader = _optimizer_and_loader(
-        model, train_data, "sleep_edf_sc", config, seed=int(seed)
+        model, train_data, new_task, config, seed=int(seed)
     )
     named_parameters = dict(model.named_parameters())
     missing = [name for name in masks if name not in named_parameters]
@@ -246,7 +269,7 @@ def run_overlap_freeze_intervention(
             labels = labels.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
             loss = F.cross_entropy(
-                model("sleep_edf_sc", signals),
+                model(new_task, signals),
                 labels,
                 label_smoothing=float(config["training"]["label_smoothing"]),
             )
@@ -275,7 +298,7 @@ def run_overlap_freeze_intervention(
     predictions = {}
     for split in ("validation", "test"):
         evaluations[split] = {}
-        for task in ("bciciv2a", "sleep_edf_sc"):
+        for task in (old_task, new_task):
             metrics, arrays = evaluate_task(
                 model, task, evaluation_loaders[split][task], device=device
             )
@@ -291,7 +314,8 @@ def run_overlap_freeze_intervention(
     forgetting = {
         split: _forgetting(
             float(before[split]["mean_subject_balanced_accuracy"]),
-            float(evaluations[split]["bciciv2a"]["mean_subject_balanced_accuracy"]),
+            float(evaluations[split][old_task]["mean_subject_balanced_accuracy"]),
+            classes=TASK_CLASSES[old_task],
             minimum_headroom=float(
                 config["evaluation"]["minimum_valid_headroom_above_chance"]
             ),
@@ -320,10 +344,9 @@ def run_overlap_freeze_intervention(
         "condition": condition,
         "config_sha256": config_sha,
         "source_checkpoint_sha256": expected_source,
-        "fisher_sha256": {
-            "bciciv2a": fisher_config["bciciv2a_sha256"],
-            "sleep_edf_sc": fisher_config["sleep_edf_sc_sha256"],
-        },
+        "old_task": old_task,
+        "new_task": new_task,
+        "fisher_sha256": expected_fisher,
         "mask": {
             "sha256": freeze_mask_sha256(masks),
             "frozen_elements": sum(layer_counts.values()),
