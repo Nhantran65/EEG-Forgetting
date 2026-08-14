@@ -332,8 +332,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy main sequential FT matrix 3 order × 3 seed và pass stability gate trước EWC/DER++.
 - [x] Hoàn thành Week 1 gate.
 - [x] Chạy validation pilot BCI→Sleep và khóa EWC `lambda=100.000`, DER++ cap `8 MiB`.
-- [ ] Chạy main EWC matrix 3 order × 3 seed với offline Fisher state đã khóa.
-- [ ] Chạy main DER++ matrix 3 order × 3 seed với reservoir 8 MiB đã khóa.
+- [x] Chạy main EWC matrix 3 order × 3 seed với offline Fisher state đã khóa.
+- [x] Chạy main DER++ matrix 3 order × 3 seed với reservoir 8 MiB đã khóa.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
@@ -373,6 +373,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-14: Method-selection pilot khóa trước cặp `BCI→Sleep`, seed 3407 và chỉ đọc validation. EWC thử `lambda=0/1.000/10.000/100.000`; DER++ thử cap `0/8/16/32 MiB`, Algorithm R với slot cố định tính đủ signal/label/logit/task metadata, hai replay draw độc lập và `alpha=beta=0,5` theo bài gốc. Candidate hợp lệ phải giữ Sleep validation BA không thấp hơn baseline quá 0,02; trong tập hợp lệ chọn `F_rel` của BCI thấp nhất, hòa thì chọn strength/bytes thấp hơn. Sau selection khóa một giá trị cho mọi order/seed, không tune lại.
 - 2026-08-14: Cả 8/8 method-selection candidate hoàn tất và summary bind input bằng SHA-256. Khóa EWC `lambda=100.000` (`F_rel` BCI 0,0096; Sleep val BA 0,6618; 12.883.200 byte mỗi Fisher/anchor state) và DER++ `8 MiB` (`F_rel` 0,0095; Sleep val BA 0,6774; 119 slot/8.381.067 byte allocated). Không mở rộng grid hoặc tune lại theo order/seed.
 - 2026-08-14: Full matrices được launch theo cùng 9 cell `forward/reverse/challenging × 3407/42/2026`: `eeg-cl-ewc-main` chỉ thấy GPU vật lý 0, `eeg-cl-derpp-main` chỉ thấy GPU vật lý 2, và `eeg-cl-method-main-summary` chờ đủ 18 immutable `result.json` rồi tự verify/tổng hợp. Mỗi checkpoint lưu model, method state và CPU/CUDA RNG state để stage-boundary resume giữ nguyên trajectory.
+- 2026-08-14: EWC/DER++ hoàn tất 18/18 main run và watchdog tạo hai digest-verified summary. Mean pair `F_rel` của Sequential/EWC/DER++ lần lượt là: BCI–PhysioNet `0,0193/-0,0776/-0,0682`; BCI–Sleep `0,3724/0,0726/0,0065`; PhysioNet–Sleep `0,3262/0,0084/0,0662`. EWC inherited signal gate báo false vì chỉ 2/6 direction còn lớn hơn seed noise; đây là forgetting suppression, không phải execution failure. DER++ còn 4/6 và pass. Pair-level Spearman vẫn exploratory với `n=3`: `-1/-1/-0,5`, không ủng hộ positive overlap-risk claim.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
@@ -411,7 +412,8 @@ Observed implementation proof on 2026-08-13:
 - PhysioNet reproduction cache matched the pinned upstream preprocessing exactly on S001R04 (`15x64x4x200`, `max_abs_diff=0.0`), contained the same 9.837 examples across 70/19/20 subjects, and reproduced the upstream classifier initialization bit-for-bit. The completed 50-epoch run selected epoch 33 and produced test BA 0,6229, kappa 0,4972 and weighted-F1 0,6241; checkpoint/config digests re-verified after the run.
 - Frozen test caches were materialized and bound to manifest v3: BCI 1.036 samples/2 subjects, PhysioNet 1.530/17 and Sleep 37.227/15. Full source-checksum manifest audit passed immediately before launching sequential FT.
 - Sequential FT completed 9/9 immutable runs (three orders × three seeds). The predeclared stability gate passed with six signal-bearing and six sign-consistent directed transitions; the summary binds every input result by SHA-256.
+- EWC and DER++ each completed 9/9 immutable runs. Recomputed summaries verified every stage/checkpoint/prediction digest. Peak persistent state was 25,766,400 bytes for two offline-EWC Fisher/anchor states and 8,381,067 bytes for DER++'s 119-slot reservoir.
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction, Fisher instrument gate, full sequential FT matrix và method-selection pilot đã hoàn thành. EWC/DER++ full matrices đang chạy trong tmux trên GPU 0/2; watchdog sẽ tự verify/tổng hợp khi đủ 18 run. TUEV vẫn cần xác nhận trước deadline truy cập.
+Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction, Fisher instrument gate, method-selection pilot và cả ba main CL matrices đã hoàn thành. Kết quả hiện tại cho thấy EWC/DER++ giảm mạnh forgetting, nhưng task-pair ranking không ủng hộ positive overlap-risk hypothesis. Bước kế tiếp là BCI robustness, joint upper bound và matched-plasticity intervention. TUEV vẫn cần xác nhận trước deadline truy cập.
