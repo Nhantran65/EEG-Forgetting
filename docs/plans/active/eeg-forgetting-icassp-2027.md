@@ -338,8 +338,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy BCI robustness fold v2 cho Sequential FT, giữ nguyên mọi hyperparameter.
 - [x] Chạy task-balanced joint-training upper bound ba seed.
 - [x] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
-- [ ] Chạy PhysioNet→BCI localization replication 5/10% × bốn mask × ba seed.
-- [ ] Chạy directional gradient/drift audit sáu transition × ba seed và tổng hợp descriptive correlation.
+- [x] Chạy PhysioNet→BCI localization replication 5/10% × bốn mask × ba seed.
+- [x] Chạy directional gradient/drift audit sáu transition × ba seed và tổng hợp descriptive correlation.
+- [ ] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run).
 
 ### Follow-up execution queue — 2026-08-14
 
@@ -354,6 +355,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - Directional audit chỉ mang vai trò descriptive/mechanistic vì có sáu transition; không dùng p-value hoặc claim predictor tổng quát từ sáu điểm này.
 - `eeg-replication-gpu0` chạy ratio 5% rồi ba hướng directional đầu trên physical GPU 0; `eeg-replication-gpu2` chạy ratio 10% rồi ba hướng còn lại trên physical GPU 2. `eeg-replication-summary` chờ đủ 24 + 18 result và tạo hai summary có digest verification.
 - Recovery 2026-08-14: intervention hoàn tất 24/24. Directional v1 dừng ở 14/18 do checksum của `physionet_to_bci/seed-2026` bị chép sai trong config (`892bcf...`). Giữ nguyên partial artifacts v1 làm audit trail; v2 chỉ sửa đúng digest nguồn, bind rõ v1 bị supersede và chạy lại đủ 18 result, không trộn hai config SHA trong summary.
+- Directional audit v2 hoàn tất 18/18 nhưng không giải thích forgetting tốt hơn overlap đối xứng (n=6, descriptive): correlation với mean `F_rel` lần lượt là overlap `-0,815`, gradient conflict `-0,646`, shared-Fisher drift `-0,715`, old-Fisher drift `-0,541`. Không mở thêm nhánh directional.
+- Final control chỉ thêm điều kiện `old_only`: freeze top Fisher của task cũ với đúng ngân sách từng layer như high-overlap. Chạy 2 cặp × 2 ratio × 3 seed = 12 run, tái dùng toàn bộ high-overlap result đã khóa. Sau control này dừng experiment branching và chuyển sang chốt analysis/paper, bất kể gate pass hay fail.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.

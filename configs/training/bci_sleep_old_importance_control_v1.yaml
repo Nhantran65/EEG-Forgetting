@@ -1,0 +1,59 @@
+schema_version: 1
+id: bci_sleep_old_importance_control_v1
+status: locked_intervention
+method: parameter_freeze_control
+seeds: [3407, 42, 2026]
+old_task: bciciv2a
+new_task: sleep_edf_sc
+source_stage:
+  role: exact_2500_step_bci_only_checkpoint
+  path_pattern: results/continual/sequential_ft_v1/forward/seed-{seed}/stage-01-bciciv2a/checkpoint.pt
+  sha256_by_seed:
+    3407: 76bf53c4a650d86d1703ecfa194ad44d4bf7826345cc78095a00633f0826d9b8
+    42: 0aea3be15717387648f72749418e937cb7cdc36268143695fe049a37f444156a
+    2026: 78c57fd1623c7858cf78e701017533172209e92eaf022ca4b39780f37b91a585
+fisher:
+  tasks:
+    bciciv2a:
+      path: results/fisher/instrument_v1/bciciv2a/seed-3407/full.pt
+      sha256: 0862efbdf7579ffceb1e8eea8bb1158132ad8165850036056e7f5567a72e18fb
+    sleep_edf_sc:
+      path: results/fisher/instrument_v1/sleep_edf_sc/seed-3407/full.pt
+      sha256: 5fab20aaa062d52f238fea31129025aa0c28213240bc57d891c4320668e1590e
+  normalization: l2_within_encoder_layer
+mask:
+  freeze_ratios: [0.05, 0.10]
+  conditions: [old_only]
+  selection_scope: independently_within_each_encoder_layer
+  old_only: top_old_task_fisher_elements
+  random_controls_per_ratio: 0
+  random_seed_base: 20260816
+  optimizer_safety: zero_gradient_then_restore_exact_anchor_after_adamw_step
+model:
+  head: flatten_mlp
+  plastic_final_encoder_blocks: 4
+training:
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+evaluation:
+  splits: [validation, test]
+  primary: mean_subject_balanced_accuracy
+  matched_new_task_tolerance_absolute: 0.02
+  minimum_valid_headroom_above_chance: 0.05
+reference_intervention:
+  id: bci_sleep_overlap_intervention_v1
+  config_path: configs/training/bci_sleep_overlap_intervention_v1.yaml
+  config_sha256: f0e0977d4381ec74be4f49d172dcd0c6557a4633a6477199ec7881b3c6de9534
+  result_root: results/interventions/bci_sleep_overlap_intervention_v1
+  summary_path: results/interventions/bci_sleep_overlap_intervention_v1/summary.json
+  summary_sha256: 1a5a3d3f501fbe8e4800e5c46578fee3cb77930718d9e740d4184d1bf121d485
+purpose: test_whether_shared_overlap_adds_beyond_old_task_importance

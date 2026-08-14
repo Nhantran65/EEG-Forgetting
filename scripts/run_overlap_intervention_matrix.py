@@ -32,6 +32,11 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         help="Optional declared ratio subset for splitting the matrix across devices.",
     )
+    parser.add_argument(
+        "--conditions",
+        nargs="+",
+        help="Optional declared condition subset for splitting the matrix.",
+    )
     return parser.parse_args()
 
 
@@ -41,10 +46,20 @@ def main() -> None:
     root = args.output_root or (
         PROJECT_ROOT / "results" / "interventions" / str(config["id"])
     )
-    conditions = ["high_overlap"] + [
+    default_conditions = ["high_overlap"] + [
         f"random_{index}"
         for index in range(int(config["mask"]["random_controls_per_ratio"]))
     ]
+    declared_conditions = tuple(
+        str(value) for value in config["mask"].get("conditions", default_conditions)
+    )
+    conditions = (
+        declared_conditions if args.conditions is None else tuple(args.conditions)
+    )
+    if not conditions or any(value not in declared_conditions for value in conditions):
+        raise ValueError(
+            "--conditions must be a non-empty subset declared by the config"
+        )
     declared_ratios = tuple(float(value) for value in config["mask"]["freeze_ratios"])
     ratios = declared_ratios if args.ratios is None else tuple(args.ratios)
     if not ratios or any(float(value) not in declared_ratios for value in ratios):

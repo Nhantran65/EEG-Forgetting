@@ -48,6 +48,30 @@ def test_freeze_masks_match_counts_per_layer_and_are_deterministic() -> None:
     assert freeze_mask_sha256(random_a) == freeze_mask_sha256(random_b)
 
 
+def test_old_only_freezes_largest_old_task_fisher_within_each_layer() -> None:
+    left, right = _fishers()
+    masks, counts = build_freeze_masks(
+        left, right, ratio=0.25, condition="old_only", random_seed=17
+    )
+    assert counts == {
+        "backbone.encoder.layers.8": 2,
+        "backbone.encoder.layers.9": 1,
+    }
+    assert masks["backbone.encoder.layers.8.weight"].tolist() == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert not masks["backbone.encoder.layers.8.bias"].any()
+    assert masks["backbone.encoder.layers.9.weight"].tolist() == [
+        True,
+        False,
+        False,
+        False,
+    ]
+
+
 def test_restore_frozen_parameters_undoes_adamw_decay_only_at_mask() -> None:
     parameter = torch.nn.Parameter(torch.tensor([1.0, 2.0, 3.0]))
     named = {"weight": parameter}

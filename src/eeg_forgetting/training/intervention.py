@@ -41,7 +41,9 @@ def build_freeze_masks(
         raise DatasetProtocolError("intervention Fisher signatures do not align")
     if not 0.0 < ratio < 1.0:
         raise DatasetProtocolError("intervention freeze ratio must be within (0,1)")
-    if condition != "high_overlap" and not condition.startswith("random_"):
+    if condition not in {"high_overlap", "old_only"} and not condition.startswith(
+        "random_"
+    ):
         raise DatasetProtocolError(f"unknown intervention condition {condition!r}")
     left = layer_l2_normalize(left_fisher)
     right = layer_l2_normalize(right_fisher)
@@ -55,16 +57,19 @@ def build_freeze_masks(
         sizes = [left[name].numel() for name in names]
         total = sum(sizes)
         count = max(1, int(round(total * ratio)))
-        if condition == "high_overlap":
-            scores = torch.cat(
-                [
-                    torch.sqrt(
-                        left[name].float().clamp_min(0)
-                        * right[name].float().clamp_min(0)
-                    ).reshape(-1)
-                    for name in names
-                ]
-            )
+        if condition in {"high_overlap", "old_only"}:
+            if condition == "high_overlap":
+                scores = torch.cat(
+                    [
+                        torch.sqrt(
+                            left[name].float().clamp_min(0)
+                            * right[name].float().clamp_min(0)
+                        ).reshape(-1)
+                        for name in names
+                    ]
+                )
+            else:
+                scores = torch.cat([left[name].float().reshape(-1) for name in names])
             selected = torch.topk(scores, k=count, largest=True, sorted=False).indices
         else:
             layer_generator = torch.Generator(device="cpu").manual_seed(
@@ -157,10 +162,14 @@ def run_overlap_freeze_intervention(
     if float(ratio) not in ratios:
         raise DatasetProtocolError(f"freeze ratio {ratio} is not declared")
     random_controls = int(config["mask"]["random_controls_per_ratio"])
-    if condition != "high_overlap":
-        valid_random = {f"random_{index}" for index in range(random_controls)}
-        if condition not in valid_random:
-            raise DatasetProtocolError(f"intervention condition {condition!r} is not declared")
+    default_conditions = ["high_overlap"] + [
+        f"random_{index}" for index in range(random_controls)
+    ]
+    declared_conditions = {
+        str(value) for value in config["mask"].get("conditions", default_conditions)
+    }
+    if condition not in declared_conditions:
+        raise DatasetProtocolError(f"intervention condition {condition!r} is not declared")
     output_dir = Path(output_dir)
     if (output_dir / "result.json").exists():
         raise DatasetProtocolError(f"refusing to overwrite intervention {output_dir}")
@@ -195,7 +204,7 @@ def run_overlap_freeze_intervention(
         if sha256_file(path) != expected_fisher[task]:
             raise DatasetProtocolError(f"{task} intervention Fisher digest mismatch")
     ratio_index = ratios.index(float(ratio))
-    random_index = 0 if condition == "high_overlap" else int(condition.split("_")[1])
+    random_index = int(condition.split("_")[1]) if condition.startswith("random_") else 0
     mask_seed = int(config["mask"]["random_seed_base"]) + 100 * ratio_index + random_index
     masks, layer_counts = build_freeze_masks(
         load_fisher(left_path),
