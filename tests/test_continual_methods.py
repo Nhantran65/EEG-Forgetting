@@ -6,6 +6,8 @@ import torch
 from eeg_forgetting.data.contracts import DatasetProtocolError
 from eeg_forgetting.training.continual_methods import (
     ByteCappedReservoir,
+    _execution_rng_state,
+    _restore_execution_rng_state,
     ewc_quadratic_penalty,
     select_method_candidate,
 )
@@ -83,3 +85,13 @@ def test_method_selection_enforces_new_task_plasticity_floor() -> None:
     )
     assert selected["minimum_allowed_new_task_validation"] == pytest.approx(0.68)
     assert selected["selected_candidate"] == 1000
+
+
+def test_execution_rng_state_restores_next_dropout_draw() -> None:
+    device = torch.device("cpu")
+    torch.manual_seed(17)
+    state = _execution_rng_state(device)
+    expected = torch.rand(8)
+    torch.rand(20)
+    _restore_execution_rng_state(state, device=device)
+    assert torch.equal(torch.rand(8), expected)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
@@ -18,8 +18,21 @@ from eeg_forgetting.data.contracts import DatasetProtocolError, load_yaml
 from eeg_forgetting.data.manifests import sha256_file
 from eeg_forgetting.models.cbramod import load_pretrained_backbone
 
-from .continual import CANONICAL_TASKS, MultiHeadCBraMod, evaluate_task
-from .fisher import load_fisher
+from .continual import (
+    CANONICAL_TASKS,
+    MultiHeadCBraMod,
+    _atomic_json as _atomic_continual_json,
+    _atomic_npz,
+    _atomic_torch_save,
+    evaluate_task,
+    pairwise_forgetting,
+)
+from .fisher import (
+    deterministic_sample_indices,
+    diagonal_empirical_fisher,
+    indices_sha256,
+    load_fisher,
+)
 from .pilot import (
     FixedStepBatchSampler,
     PilotSettings,
@@ -777,3 +790,641 @@ def select_method_candidate(
         "selected_candidate": selected["candidate"],
         "candidates": sorted(rows, key=lambda row: float(row["candidate"])),
     }
+
+
+class _TaskFisherView(nn.Module):
+    """Expose a multi-head task with Fisher-compatible backbone parameter names."""
+
+    def __init__(self, model: MultiHeadCBraMod, task: str):
+        super().__init__()
+        self.backbone = model.backbone
+        self.classifier = model.heads[task]
+
+    def forward(self, signals: Tensor) -> Tensor:
+        return self.classifier(self.backbone.forward_features(signals))
+
+
+def _validate_main_method_config(
+    config: Mapping[str, object], *, method: str, order_name: str, seed: int
+) -> tuple[str, ...]:
+    if config.get("status") != "locked_main" or config.get("method") != method:
+        raise DatasetProtocolError(f"expected locked main {method} config")
+    if tuple(config.get("canonical_tasks", ())) != CANONICAL_TASKS:
+        raise DatasetProtocolError("main method config changed the canonical tasks")
+    if order_name not in config["orders"]:
+        raise DatasetProtocolError(f"unknown {method} order {order_name!r}")
+    order = tuple(config["orders"][order_name])
+    if set(order) != set(CANONICAL_TASKS) or len(order) != len(CANONICAL_TASKS):
+        raise DatasetProtocolError("main method order must contain every task once")
+    if int(seed) not in tuple(int(value) for value in config["seeds"]):
+        raise DatasetProtocolError(f"seed {seed} is not declared by {method} config")
+    if int(config["training"]["optimizer_steps_per_task"]) != 2500:
+        raise DatasetProtocolError("main method changed the locked task step budget")
+    if config["training"]["evaluation_split"] != "test":
+        raise DatasetProtocolError("main method matrix must evaluate frozen test splits")
+    derivation = config["derivation"]
+    summary_path = Path(str(derivation["pilot_summary"]))
+    if sha256_file(summary_path) != derivation["pilot_summary_sha256"]:
+        raise DatasetProtocolError("method-selection summary digest mismatch")
+    with summary_path.open(encoding="utf-8") as handle:
+        summary = json.load(handle)
+    selected = summary["selection"][method]["selected_candidate"]
+    declared = (
+        config["ewc"]["strength"]
+        if method == "ewc"
+        else config["derpp"]["selected_byte_cap_mib"]
+    )
+    if float(selected) != float(declared):
+        raise DatasetProtocolError("main method setting differs from pilot selection")
+    return order
+
+
+def _load_main_data(
+    cache_root: Path, *, batch_size: int
+) -> tuple[
+    dict[str, CachedEEGDataset],
+    dict[str, CachedEEGDataset],
+    dict[str, DataLoader],
+]:
+    train_sets = {
+        task: CachedEEGDataset(cache_root / task / "train" / "index.json")
+        for task in CANONICAL_TASKS
+    }
+    test_sets = {
+        task: CachedEEGDataset(cache_root / task / "test" / "index.json")
+        for task in CANONICAL_TASKS
+    }
+    test_loaders = {
+        task: DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
+        )
+        for task, dataset in test_sets.items()
+    }
+    return train_sets, test_sets, test_loaders
+
+
+def _resume_main_stages(
+    *,
+    output_dir: Path,
+    order: Sequence[str],
+    config_sha: str,
+) -> tuple[list[dict[str, object]], Path | None]:
+    completed = []
+    latest = None
+    for index, task in enumerate(order, start=1):
+        stage_dir = output_dir / f"stage-{index:02d}-{task}"
+        stage_path = stage_dir / "stage.json"
+        if not stage_path.exists():
+            if stage_dir.exists() and any(stage_dir.iterdir()):
+                raise DatasetProtocolError(
+                    f"incomplete method stage requires recovery: {stage_dir}"
+                )
+            break
+        with stage_path.open(encoding="utf-8") as handle:
+            document = json.load(handle)
+        checkpoint = stage_dir / str(document["checkpoint"]["file"])
+        if (
+            document["config_sha256"] != config_sha
+            or sha256_file(checkpoint) != document["checkpoint"]["sha256"]
+        ):
+            raise DatasetProtocolError(f"method stage resume digest mismatch: {stage_dir}")
+        completed.append(document)
+        latest = checkpoint
+    return completed, latest
+
+
+def _execution_rng_state(device: torch.device) -> dict[str, Tensor]:
+    state = {"torch_cpu": torch.get_rng_state()}
+    if device.type == "cuda":
+        state["torch_cuda"] = torch.cuda.get_rng_state(device)
+    return state
+
+
+def _restore_execution_rng_state(
+    state: Mapping[str, Tensor], *, device: torch.device
+) -> None:
+    torch.set_rng_state(state["torch_cpu"])
+    if device.type == "cuda":
+        if "torch_cuda" not in state:
+            raise DatasetProtocolError("method checkpoint lacks CUDA RNG state")
+        torch.cuda.set_rng_state(state["torch_cuda"], device)
+
+
+def _evaluate_stage(
+    model: MultiHeadCBraMod,
+    *,
+    seen_tasks: Sequence[str],
+    loaders: Mapping[str, DataLoader],
+    stage_dir: Path,
+    device: torch.device,
+) -> tuple[dict[str, object], dict[str, dict[str, str]]]:
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    evaluations = {}
+    predictions = {}
+    for task in seen_tasks:
+        metrics, arrays = evaluate_task(model, task, loaders[task], device=device)
+        prediction_path = stage_dir / f"predictions-{task}.npz"
+        _atomic_npz(prediction_path, arrays)
+        evaluations[task] = metrics
+        predictions[task] = {
+            "file": prediction_path.name,
+            "sha256": sha256_file(prediction_path),
+        }
+        print(
+            f"eval={task} subject_BA={metrics['mean_subject_balanced_accuracy']:.5f}",
+            flush=True,
+        )
+    return evaluations, predictions
+
+
+def _ewc_state_bytes(states: Sequence[Mapping[str, object]]) -> int:
+    total = 0
+    for state in states:
+        fisher = state["fisher"]
+        anchors = state["anchors"]
+        total += sum(
+            fisher[name].numel()
+            * (fisher[name].element_size() + anchors[name].element_size())
+            for name in fisher
+        )
+    return total
+
+
+def _train_ewc_main_stage(
+    model: MultiHeadCBraMod,
+    dataset: CachedEEGDataset,
+    task: str,
+    states: Sequence[Mapping[str, object]],
+    config: Mapping[str, object],
+    *,
+    seed: int,
+    device: torch.device,
+) -> list[dict[str, float | int]]:
+    trainable, optimizer, scheduler, loader = _optimizer_and_loader(
+        model, dataset, task, config, seed=seed
+    )
+    training = config["training"]
+    strength = float(config["ewc"]["strength"])
+    interval = int(training["progress_interval_steps"])
+    device_states = [
+        {
+            "fisher": OrderedDict(
+                (name, value.to(device)) for name, value in state["fisher"].items()
+            ),
+            "anchors": OrderedDict(
+                (name, value.to(device)) for name, value in state["anchors"].items()
+            ),
+        }
+        for state in states
+    ]
+    recent_total: deque[float] = deque(maxlen=interval)
+    recent_current: deque[float] = deque(maxlen=interval)
+    recent_penalty: deque[float] = deque(maxlen=interval)
+    curve = []
+    for step, (signals, labels, _subjects) in enumerate(loader, start=1):
+        signals = signals.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
+        optimizer.zero_grad(set_to_none=True)
+        current_loss = F.cross_entropy(
+            model(task, signals),
+            labels,
+            label_smoothing=float(training["label_smoothing"]),
+        )
+        named_parameters = dict(model.named_parameters())
+        quadratics = [
+            ewc_quadratic_penalty(
+                named_parameters, state["fisher"], state["anchors"]
+            )
+            for state in device_states
+        ]
+        penalty = (
+            0.5 * strength * torch.stack(quadratics).sum()
+            if quadratics
+            else torch.zeros((), device=device)
+        )
+        loss = current_loss + penalty
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(trainable, float(training["gradient_clip_norm"]))
+        optimizer.step()
+        scheduler.step()
+        recent_total.append(float(loss.detach()))
+        recent_current.append(float(current_loss.detach()))
+        recent_penalty.append(float(penalty.detach()))
+        if step % interval == 0:
+            point: dict[str, float | int] = {
+                "step": step,
+                "total_loss": float(np.mean(recent_total)),
+                "current_loss": float(np.mean(recent_current)),
+                "ewc_penalty": float(np.mean(recent_penalty)),
+                "protected_prior_tasks": len(states),
+            }
+            curve.append(point)
+            print(
+                f"ewc task={task} step={step}/{training['optimizer_steps_per_task']} "
+                f"loss={point['total_loss']:.5f} penalty={point['ewc_penalty']:.5f}",
+                flush=True,
+            )
+    return curve
+
+
+def _extract_ewc_state(
+    model: MultiHeadCBraMod,
+    dataset: CachedEEGDataset,
+    task: str,
+    config: Mapping[str, object],
+    *,
+    seed: int,
+    device: torch.device,
+) -> dict[str, object]:
+    settings = config["ewc"]
+    canonical_index = CANONICAL_TASKS.index(task) + 1
+    sampling_seed = int(seed) + 100003 * canonical_index
+    indices = deterministic_sample_indices(
+        len(dataset),
+        sample_count=int(settings["sample_count_per_completed_nonfinal_task"]),
+        seed=sampling_seed,
+    )
+    view = _TaskFisherView(model, task)
+    last_reported = 0
+
+    def report(completed: int, total: int) -> None:
+        nonlocal last_reported
+        interval = int(settings["progress_interval_examples"])
+        if completed == total or completed - last_reported >= interval:
+            print(f"ewc task={task} Fisher {completed}/{total}", flush=True)
+            last_reported = completed
+
+    fisher = diagonal_empirical_fisher(
+        view,
+        dataset,
+        indices,
+        final_blocks=int(config["model"]["plastic_final_encoder_blocks"]),
+        microbatch_size=int(settings["gradient_microbatch_size"]),
+        device=device,
+        progress=report,
+    )
+    named = dict(model.named_parameters())
+    anchors = OrderedDict(
+        (name, named[name].detach().cpu().clone()) for name in fisher
+    )
+    return {
+        "task": task,
+        "fisher": fisher,
+        "anchors": anchors,
+        "samples": len(indices),
+        "sampling_seed": sampling_seed,
+        "sample_indices_sha256": indices_sha256(indices),
+    }
+
+
+def _main_result(
+    *,
+    config: Mapping[str, object],
+    config_sha: str,
+    order_name: str,
+    order: Sequence[str],
+    seed: int,
+    checkpoint_sha256: str,
+    cache_root: Path,
+    train_sets: Mapping[str, CachedEEGDataset],
+    test_sets: Mapping[str, CachedEEGDataset],
+    completed_stages: Sequence[Mapping[str, object]],
+    output_dir: Path,
+    device: torch.device,
+    memory: Mapping[str, object],
+) -> dict[str, object]:
+    result = {
+        "schema_version": 1,
+        "run": config["id"],
+        "method": config["method"],
+        "order_name": order_name,
+        "order": list(order),
+        "seed": int(seed),
+        "config_sha256": config_sha,
+        "pretrained_checkpoint_sha256": checkpoint_sha256,
+        "cache_indices": {
+            split: {
+                task: sha256_file(dataset.index_path)
+                for task, dataset in datasets.items()
+            }
+            for split, datasets in (("train", train_sets), ("test", test_sets))
+        },
+        "stages": [
+            {
+                "stage": stage["stage"],
+                "learned_task": stage["learned_task"],
+                "stage_result_sha256": sha256_file(
+                    output_dir
+                    / f"stage-{stage['stage']:02d}-{stage['learned_task']}"
+                    / "stage.json"
+                ),
+                "evaluations": stage["evaluations"],
+                "memory": stage["memory"],
+            }
+            for stage in completed_stages
+        ],
+        "pairwise_forgetting": pairwise_forgetting(
+            completed_stages,
+            order,
+            minimum_headroom=float(
+                config["forgetting"]["minimum_valid_headroom_above_chance"]
+            ),
+        ),
+        "memory": dict(memory),
+        "device": str(device),
+        "torch": torch.__version__,
+    }
+    _atomic_continual_json(output_dir / "result.json", result)
+    return result
+
+
+def run_ewc_continual_matrix_run(
+    *,
+    config_path: str | Path,
+    order_name: str,
+    seed: int,
+    cache_root: str | Path,
+    checkpoint_path: str | Path,
+    checkpoint_sha256: str,
+    output_dir: str | Path,
+    device: str | torch.device,
+) -> dict[str, object]:
+    config_path = Path(config_path)
+    config = load_yaml(config_path)
+    order = _validate_main_method_config(
+        config, method="ewc", order_name=order_name, seed=seed
+    )
+    output_dir = Path(output_dir)
+    if (output_dir / "result.json").exists():
+        raise DatasetProtocolError(f"refusing to overwrite EWC run {output_dir}")
+    set_determinism(int(seed))
+    device = torch.device(device)
+    torch.cuda.set_device(device)
+    cache_root = Path(cache_root)
+    train_sets, test_sets, test_loaders = _load_main_data(
+        cache_root, batch_size=int(config["training"]["batch_size"])
+    )
+    backbone = load_pretrained_backbone(
+        checkpoint_path, expected_sha256=checkpoint_sha256, map_location="cpu"
+    )
+    model = MultiHeadCBraMod(backbone).to(device)
+    config_sha = sha256_file(config_path)
+    completed_stages, latest_checkpoint = _resume_main_stages(
+        output_dir=output_dir, order=order, config_sha=config_sha
+    )
+    states: list[dict[str, object]] = []
+    if latest_checkpoint is not None:
+        checkpoint = torch.load(
+            latest_checkpoint, map_location="cpu", weights_only=True
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        states = list(checkpoint["ewc_states"])
+        _restore_execution_rng_state(checkpoint["execution_rng_state"], device=device)
+        print(
+            f"resumed ewc {order_name} seed={seed} after stage={len(completed_stages)}",
+            flush=True,
+        )
+
+    for index in range(len(completed_stages), len(order)):
+        task = order[index]
+        stage_number = index + 1
+        curve = _train_ewc_main_stage(
+            model,
+            train_sets[task],
+            task,
+            states,
+            config,
+            seed=int(seed),
+            device=device,
+        )
+        stage_dir = output_dir / f"stage-{stage_number:02d}-{task}"
+        evaluations, predictions = _evaluate_stage(
+            model,
+            seen_tasks=order[:stage_number],
+            loaders=test_loaders,
+            stage_dir=stage_dir,
+            device=device,
+        )
+        fisher_metadata = None
+        if stage_number < len(order):
+            new_state = _extract_ewc_state(
+                model,
+                train_sets[task],
+                task,
+                config,
+                seed=int(seed),
+                device=device,
+            )
+            states.append(new_state)
+            fisher_metadata = {
+                key: value
+                for key, value in new_state.items()
+                if key not in {"fisher", "anchors"}
+            }
+        memory = {
+            "retained_prior_task_states": len(states),
+            "fisher_and_anchor_bytes": _ewc_state_bytes(states),
+            "protected_parameters_per_state": (
+                sum(value.numel() for value in states[0]["fisher"].values())
+                if states
+                else 0
+            ),
+        }
+        checkpoint_output = stage_dir / "checkpoint.pt"
+        _atomic_torch_save(
+            checkpoint_output,
+            {
+                "model_state_dict": model.state_dict(),
+                "ewc_states": states,
+                "stage": stage_number,
+                "task": task,
+                "order": order,
+                "seed": int(seed),
+                "config_sha256": config_sha,
+                "execution_rng_state": _execution_rng_state(device),
+            },
+        )
+        stage_document = {
+            "schema_version": 1,
+            "run": config["id"],
+            "method": "ewc",
+            "order_name": order_name,
+            "order": list(order),
+            "seed": int(seed),
+            "stage": stage_number,
+            "learned_task": task,
+            "optimizer_steps": int(config["training"]["optimizer_steps_per_task"]),
+            "config_sha256": config_sha,
+            "curve": curve,
+            "evaluations": evaluations,
+            "predictions": predictions,
+            "fisher_estimation": fisher_metadata,
+            "memory": memory,
+            "checkpoint": {
+                "file": checkpoint_output.name,
+                "sha256": sha256_file(checkpoint_output),
+            },
+        }
+        _atomic_continual_json(stage_dir / "stage.json", stage_document)
+        completed_stages.append(stage_document)
+
+    memory = {
+        "peak_fisher_and_anchor_bytes": max(
+            int(stage["memory"]["fisher_and_anchor_bytes"])
+            for stage in completed_stages
+        ),
+        "final_retained_prior_task_states": int(
+            completed_stages[-1]["memory"]["retained_prior_task_states"]
+        ),
+        "formulation": "offline_ewc",
+    }
+    return _main_result(
+        config=config,
+        config_sha=config_sha,
+        order_name=order_name,
+        order=order,
+        seed=int(seed),
+        checkpoint_sha256=checkpoint_sha256,
+        cache_root=cache_root,
+        train_sets=train_sets,
+        test_sets=test_sets,
+        completed_stages=completed_stages,
+        output_dir=output_dir,
+        device=device,
+        memory=memory,
+    )
+
+
+def run_derpp_continual_matrix_run(
+    *,
+    config_path: str | Path,
+    order_name: str,
+    seed: int,
+    cache_root: str | Path,
+    checkpoint_path: str | Path,
+    checkpoint_sha256: str,
+    output_dir: str | Path,
+    device: str | torch.device,
+) -> dict[str, object]:
+    config_path = Path(config_path)
+    config = load_yaml(config_path)
+    order = _validate_main_method_config(
+        config, method="derpp", order_name=order_name, seed=seed
+    )
+    output_dir = Path(output_dir)
+    if (output_dir / "result.json").exists():
+        raise DatasetProtocolError(f"refusing to overwrite DER++ run {output_dir}")
+    set_determinism(int(seed))
+    device = torch.device(device)
+    torch.cuda.set_device(device)
+    cache_root = Path(cache_root)
+    train_sets, test_sets, test_loaders = _load_main_data(
+        cache_root, batch_size=int(config["training"]["batch_size"])
+    )
+    backbone = load_pretrained_backbone(
+        checkpoint_path, expected_sha256=checkpoint_sha256, map_location="cpu"
+    )
+    model = MultiHeadCBraMod(backbone).to(device)
+    method = config["derpp"]
+    buffer = ByteCappedReservoir(
+        int(method["persistent_byte_cap"]), seed=int(seed) + 9173
+    )
+    config_sha = sha256_file(config_path)
+    completed_stages, latest_checkpoint = _resume_main_stages(
+        output_dir=output_dir, order=order, config_sha=config_sha
+    )
+    if latest_checkpoint is not None:
+        checkpoint = torch.load(
+            latest_checkpoint, map_location="cpu", weights_only=True
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        buffer.load_state_dict(checkpoint["buffer_state_dict"])
+        _restore_execution_rng_state(checkpoint["execution_rng_state"], device=device)
+        print(
+            f"resumed derpp {order_name} seed={seed} after stage={len(completed_stages)}",
+            flush=True,
+        )
+
+    for index in range(len(completed_stages), len(order)):
+        task = order[index]
+        stage_number = index + 1
+        curve = _train_derpp_stage(
+            model,
+            buffer,
+            train_sets[task],
+            task,
+            config,
+            seed=int(seed),
+            device=device,
+        )
+        stage_dir = output_dir / f"stage-{stage_number:02d}-{task}"
+        evaluations, predictions = _evaluate_stage(
+            model,
+            seen_tasks=order[:stage_number],
+            loaders=test_loaders,
+            stage_dir=stage_dir,
+            device=device,
+        )
+        memory = buffer.inventory()
+        checkpoint_output = stage_dir / "checkpoint.pt"
+        _atomic_torch_save(
+            checkpoint_output,
+            {
+                "model_state_dict": model.state_dict(),
+                "buffer_state_dict": buffer.state_dict(),
+                "stage": stage_number,
+                "task": task,
+                "order": order,
+                "seed": int(seed),
+                "config_sha256": config_sha,
+                "execution_rng_state": _execution_rng_state(device),
+            },
+        )
+        stage_document = {
+            "schema_version": 1,
+            "run": config["id"],
+            "method": "derpp",
+            "order_name": order_name,
+            "order": list(order),
+            "seed": int(seed),
+            "stage": stage_number,
+            "learned_task": task,
+            "optimizer_steps": int(config["training"]["optimizer_steps_per_task"]),
+            "config_sha256": config_sha,
+            "curve": curve,
+            "evaluations": evaluations,
+            "predictions": predictions,
+            "memory": memory,
+            "checkpoint": {
+                "file": checkpoint_output.name,
+                "sha256": sha256_file(checkpoint_output),
+            },
+        }
+        _atomic_continual_json(stage_dir / "stage.json", stage_document)
+        completed_stages.append(stage_document)
+
+    inventories = [stage["memory"] for stage in completed_stages]
+    memory = {
+        "peak_allocated_bytes": max(int(item["allocated_bytes"]) for item in inventories),
+        "final": inventories[-1],
+        "persistent_byte_cap": int(method["persistent_byte_cap"]),
+    }
+    return _main_result(
+        config=config,
+        config_sha=config_sha,
+        order_name=order_name,
+        order=order,
+        seed=int(seed),
+        checkpoint_sha256=checkpoint_sha256,
+        cache_root=cache_root,
+        train_sets=train_sets,
+        test_sets=test_sets,
+        completed_stages=completed_stages,
+        output_dir=output_dir,
+        device=device,
+        memory=memory,
+    )

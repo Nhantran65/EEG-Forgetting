@@ -331,7 +331,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy sequential FT smoke forward/reverse trên test subjects và lưu `R`/predictions/checkpoints.
 - [x] Chạy main sequential FT matrix 3 order × 3 seed và pass stability gate trước EWC/DER++.
 - [x] Hoàn thành Week 1 gate.
-- [ ] Chạy validation pilot BCI→Sleep để khóa một EWC strength và một DER++ byte cap trước full matrix.
+- [x] Chạy validation pilot BCI→Sleep và khóa EWC `lambda=100.000`, DER++ cap `8 MiB`.
+- [ ] Chạy main EWC matrix 3 order × 3 seed với offline Fisher state đã khóa.
+- [ ] Chạy main DER++ matrix 3 order × 3 seed với reservoir 8 MiB đã khóa.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
@@ -369,6 +371,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-14: Main sequential FT khóa seeds 3407/42/2026 và order thứ ba challenging `PhysioNet→BCI→Sleep`, tạo ma trận 9 run. Stability gate yêu cầu đủ ít nhất ba replicate hợp lệ cho sáu direction; ít nhất bốn direction phải có `|mean F_rel| > sample SD` và ít nhất 2/3 replicate cùng dấu. Chỉ sau gate này mới scale EWC/DER++.
 - 2026-08-14: Cả 9/9 sequential run hoàn tất và stability gate pass: đủ replicate, 6/6 direction vượt signal rule và 6/6 nhất quán dấu. Năm direction có forgetting dương; `BCI←PhysioNet` có backward transfer nhất quán (`mean F_rel=-0,2351`). Ba unordered pair cho Fisher cosine 0,8277/0,5672/0,5871 và mean `F_rel` 0,0193/0,3724/0,3262; Spearman `rho=-1` chỉ là exploratory vì `n=3`, không được diễn giải confirmatory.
 - 2026-08-14: Method-selection pilot khóa trước cặp `BCI→Sleep`, seed 3407 và chỉ đọc validation. EWC thử `lambda=0/1.000/10.000/100.000`; DER++ thử cap `0/8/16/32 MiB`, Algorithm R với slot cố định tính đủ signal/label/logit/task metadata, hai replay draw độc lập và `alpha=beta=0,5` theo bài gốc. Candidate hợp lệ phải giữ Sleep validation BA không thấp hơn baseline quá 0,02; trong tập hợp lệ chọn `F_rel` của BCI thấp nhất, hòa thì chọn strength/bytes thấp hơn. Sau selection khóa một giá trị cho mọi order/seed, không tune lại.
+- 2026-08-14: Cả 8/8 method-selection candidate hoàn tất và summary bind input bằng SHA-256. Khóa EWC `lambda=100.000` (`F_rel` BCI 0,0096; Sleep val BA 0,6618; 12.883.200 byte mỗi Fisher/anchor state) và DER++ `8 MiB` (`F_rel` 0,0095; Sleep val BA 0,6774; 119 slot/8.381.067 byte allocated). Không mở rộng grid hoặc tune lại theo order/seed.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.
