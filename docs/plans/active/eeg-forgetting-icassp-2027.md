@@ -334,10 +334,12 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy validation pilot BCI→Sleep và khóa EWC `lambda=100.000`, DER++ cap `8 MiB`.
 - [x] Chạy main EWC matrix 3 order × 3 seed với offline Fisher state đã khóa.
 - [x] Chạy main DER++ matrix 3 order × 3 seed với reservoir 8 MiB đã khóa.
-- [ ] Tách sáu directed transition và hoàn tất path-free two-task Sequential FT bằng ba chiều còn thiếu × ba seed.
-- [ ] Chạy BCI robustness fold v2 cho Sequential FT, giữ nguyên mọi hyperparameter.
-- [ ] Chạy task-balanced joint-training upper bound ba seed.
-- [ ] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
+- [x] Tách sáu directed transition và hoàn tất path-free two-task Sequential FT bằng ba chiều còn thiếu × ba seed.
+- [x] Chạy BCI robustness fold v2 cho Sequential FT, giữ nguyên mọi hyperparameter.
+- [x] Chạy task-balanced joint-training upper bound ba seed.
+- [x] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
+- [ ] Chạy PhysioNet→BCI localization replication 5/10% × bốn mask × ba seed.
+- [ ] Chạy directional gradient/drift audit sáu transition × ba seed và tổng hợp descriptive correlation.
 
 ### Follow-up execution queue — 2026-08-14
 
@@ -350,6 +352,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - Follow-up localization replication dùng hướng `physionet_mi → bciciv2a`, tỷ lệ 5/10%, ba matched random mask và ba seed (24 run). Hai tỷ lệ đều phải pass matched-plasticity/protection gate; không dùng lại mức 1% yếu trên validation của cặp đầu.
 - Directional audit chạy đủ sáu transition × ba seed tại checkpoint old-task. Mỗi task dùng cố định 1.024 mẫu train để đo signed mean observed-label NLL gradient trên bốn encoder block plastic. Báo negative gradient cosine như conflict score, cùng exact post-training parameter drift được weighted bởi old-task Fisher và geometric-mean shared Fisher.
 - Directional audit chỉ mang vai trò descriptive/mechanistic vì có sáu transition; không dùng p-value hoặc claim predictor tổng quát từ sáu điểm này.
+- `eeg-replication-gpu0` chạy ratio 5% rồi ba hướng directional đầu trên physical GPU 0; `eeg-replication-gpu2` chạy ratio 10% rồi ba hướng còn lại trên physical GPU 2. `eeg-replication-summary` chờ đủ 24 + 18 result và tạo hai summary có digest verification.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
