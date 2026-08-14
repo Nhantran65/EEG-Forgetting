@@ -1,0 +1,46 @@
+schema_version: 1
+id: sequential_pairwise_clean_v1
+status: locked_pairwise
+method: sequential_finetuning
+manifest_version: v3
+seeds: [3407, 42, 2026]
+canonical_tasks: [bciciv2a, physionet_mi, sleep_edf_sc]
+orders:
+  bci_to_sleep: [bciciv2a, sleep_edf_sc]
+  sleep_to_bci: [sleep_edf_sc, bciciv2a]
+  physionet_to_sleep: [physionet_mi, sleep_edf_sc]
+existing_path_free_transitions:
+  bci_to_physionet: sequential_ft_v1/forward/stage_1_to_2
+  sleep_to_physionet: sequential_ft_v1/reverse/stage_1_to_2
+  physionet_to_bci: sequential_ft_v1/challenging/stage_1_to_2
+model:
+  head: flatten_mlp
+  head_initialization: preinitialize_all_in_canonical_task_order
+  plastic_final_encoder_blocks: 4
+  frozen_backbone_mode: eval
+training:
+  train_split: train
+  evaluation_split: test
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  optimizer_reset_each_task: true
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+evaluation:
+  primary: mean_subject_balanced_accuracy
+  save_predictions: true
+  evaluate_seen_tasks_after_each_stage: true
+forgetting:
+  minimum_valid_headroom_above_chance: 0.05
+  invalid_action: retain_raw_and_flag_relative_null_without_clipping
+recovery:
+  checkpoint_after_each_task: true
+  resume_only_from_digest_verified_complete_stage: true
+purpose: complete_path_free_six_direction_sequential_matrix_without_task_history

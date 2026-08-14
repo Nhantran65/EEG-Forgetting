@@ -1,0 +1,17 @@
+schema_version: 1
+id: bciciv2a_robustness_v2
+status: locked_robustness
+source_protocol: configs/datasets/bciciv2a.yaml
+unit: subject
+name: fixed_subject_holdout_v2_rotate_two
+train: [A03, A04, A05, A06, A07]
+validation: [A08, A09]
+test: [A01, A02]
+no_subject_overlap: true
+relationship_to_main:
+  main_train: [A01, A02, A03, A04, A05]
+  purpose: change_all_roles_and_evaluate_on_subjects_not_in_main_test
+  models_retrained_from_pretrained_checkpoint: true
+notes:
+  - Main and robustness folds are separate complete experiments; a subject appearing in different roles across folds is not leakage.
+  - No hyperparameter is retuned on this fold.

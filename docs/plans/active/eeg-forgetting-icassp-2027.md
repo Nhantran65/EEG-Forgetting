@@ -334,6 +334,10 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy validation pilot BCI→Sleep và khóa EWC `lambda=100.000`, DER++ cap `8 MiB`.
 - [x] Chạy main EWC matrix 3 order × 3 seed với offline Fisher state đã khóa.
 - [x] Chạy main DER++ matrix 3 order × 3 seed với reservoir 8 MiB đã khóa.
+- [ ] Tách sáu directed transition và hoàn tất path-free two-task Sequential FT bằng ba chiều còn thiếu × ba seed.
+- [ ] Chạy BCI robustness fold v2 cho Sequential FT, giữ nguyên mọi hyperparameter.
+- [ ] Chạy task-balanced joint-training upper bound ba seed.
+- [ ] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
@@ -374,6 +378,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-14: Cả 8/8 method-selection candidate hoàn tất và summary bind input bằng SHA-256. Khóa EWC `lambda=100.000` (`F_rel` BCI 0,0096; Sleep val BA 0,6618; 12.883.200 byte mỗi Fisher/anchor state) và DER++ `8 MiB` (`F_rel` 0,0095; Sleep val BA 0,6774; 119 slot/8.381.067 byte allocated). Không mở rộng grid hoặc tune lại theo order/seed.
 - 2026-08-14: Full matrices được launch theo cùng 9 cell `forward/reverse/challenging × 3407/42/2026`: `eeg-cl-ewc-main` chỉ thấy GPU vật lý 0, `eeg-cl-derpp-main` chỉ thấy GPU vật lý 2, và `eeg-cl-method-main-summary` chờ đủ 18 immutable `result.json` rồi tự verify/tổng hợp. Mỗi checkpoint lưu model, method state và CPU/CUDA RNG state để stage-boundary resume giữ nguyên trajectory.
 - 2026-08-14: EWC/DER++ hoàn tất 18/18 main run và watchdog tạo hai digest-verified summary. Mean pair `F_rel` của Sequential/EWC/DER++ lần lượt là: BCI–PhysioNet `0,0193/-0,0776/-0,0682`; BCI–Sleep `0,3724/0,0726/0,0065`; PhysioNet–Sleep `0,3262/0,0084/0,0662`. EWC inherited signal gate báo false vì chỉ 2/6 direction còn lớn hơn seed noise; đây là forgetting suppression, không phải execution failure. DER++ còn 4/6 và pass. Pair-level Spearman vẫn exploratory với `n=3`: `-1/-1/-0,5`, không ủng hộ positive overlap-risk claim.
+- 2026-08-14: Follow-up khóa trước khi chạy: clean directional matrix tái dùng ba first-transition hiện có và chỉ bổ sung `BCI→Sleep`, `Sleep→BCI`, `PhysioNet→Sleep` ở ba seed; BCI robustness fold v2 là train A03–A07/validation A08–A09/test A01–A02 và không retune; joint upper bound dùng canonical round-robin với đúng 2.500 optimizer update/task; intervention BCI→Sleep dùng element-wise geometric-mean Fisher score, freeze 1/5/10% trong từng layer, so với ba random mask cùng layer/count ở ba seed và restore giá trị frozen sau AdamW step.
 - 2026-08-13: Shared preprocessing là 200 Hz, 0,5–40 Hz và microvolt/100; budget-matched là 2.500 step nhưng converged baseline được chạy riêng.
 - 2026-08-13: Audit code TUEV đã pin xác nhận pickle ở µV và loader upstream chia 100; main đổi duy nhất filter raw thành 0,5–40 Hz, còn một reproduction giữ nguyên 0,3–75 Hz + notch 60 Hz.
 - 2026-08-13: Main `R` dùng balanced accuracy; pairwise outcome chính là `F_rel`; bỏ FWT.

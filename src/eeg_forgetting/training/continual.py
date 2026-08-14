@@ -204,10 +204,16 @@ def run_sequential_finetuning(
 
     config_path = Path(config_path)
     config = load_yaml(config_path)
-    if config["status"] not in {"locked_smoke", "locked_main"} or order_name not in config["orders"]:
+    status = config["status"]
+    if status not in {"locked_smoke", "locked_main", "locked_pairwise"} or order_name not in config["orders"]:
         raise DatasetProtocolError("unknown sequential FT smoke order")
     order = tuple(config["orders"][order_name])
-    if set(order) != set(CANONICAL_TASKS):
+    if status == "locked_pairwise":
+        if len(order) != 2 or len(set(order)) != 2 or not set(order).issubset(CANONICAL_TASKS):
+            raise DatasetProtocolError(
+                "pairwise sequential order must contain two distinct locked tasks"
+            )
+    elif set(order) != set(CANONICAL_TASKS):
         raise DatasetProtocolError("sequential FT order must contain every locked task once")
     output_dir = Path(output_dir)
     result_path = output_dir / "result.json"
@@ -223,12 +229,27 @@ def run_sequential_finetuning(
     device = torch.device(device)
     torch.cuda.set_device(device)
     cache_root = Path(cache_root)
+    configured_roots = config.get("cache_roots")
+    if configured_roots is None:
+        task_cache_roots = {task: cache_root for task in CANONICAL_TASKS}
+    else:
+        project_root = config_path.resolve().parents[2]
+        if set(configured_roots) != set(CANONICAL_TASKS):
+            raise DatasetProtocolError("configured cache roots must cover every locked task")
+        task_cache_roots = {
+            task: (
+                Path(str(value)).resolve()
+                if Path(str(value)).is_absolute()
+                else (project_root / str(value)).resolve()
+            )
+            for task, value in configured_roots.items()
+        }
     train_sets = {
-        task: CachedEEGDataset(cache_root / task / "train" / "index.json")
+        task: CachedEEGDataset(task_cache_roots[task] / task / "train" / "index.json")
         for task in CANONICAL_TASKS
     }
     test_sets = {
-        task: CachedEEGDataset(cache_root / task / "test" / "index.json")
+        task: CachedEEGDataset(task_cache_roots[task] / task / "test" / "index.json")
         for task in CANONICAL_TASKS
     }
     test_loaders = {

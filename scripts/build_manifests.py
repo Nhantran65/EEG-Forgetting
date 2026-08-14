@@ -37,6 +37,11 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="New version directory, for example manifests/v4; existing files are never replaced.",
     )
+    parser.add_argument(
+        "--bci-split-config",
+        type=Path,
+        help="Optional locked BCI split config for a new robustness manifest set.",
+    )
     return parser.parse_args()
 
 
@@ -80,13 +85,27 @@ def assignment(split: SubjectSplit) -> dict[str, str]:
     }
 
 
-def bci_rows(raw_root: Path) -> tuple[list[dict[str, object]], dict[str, object]]:
+def bci_rows(
+    raw_root: Path, split_config_path: Path | None = None
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     root = raw_root / "bciciv2a"
-    split = SubjectSplit(
-        train=tuple(f"A{value:02d}" for value in range(1, 6)),
-        validation=("A06", "A07"),
-        test=("A08", "A09"),
-    )
+    split_name = "fixed_subject_holdout_v1"
+    if split_config_path is None:
+        split = SubjectSplit(
+            train=tuple(f"A{value:02d}" for value in range(1, 6)),
+            validation=("A06", "A07"),
+            test=("A08", "A09"),
+        )
+    else:
+        document = load_yaml(split_config_path)
+        if document.get("status") != "locked_robustness":
+            raise DatasetProtocolError("BCI robustness split config is not locked")
+        split_name = str(document["name"])
+        split = SubjectSplit(
+            train=tuple(str(value) for value in document["train"]),
+            validation=tuple(str(value) for value in document["validation"]),
+            test=tuple(str(value) for value in document["test"]),
+        )
     split.validate(expected_total=9)
     groups = assignment(split)
     rows = []
@@ -106,7 +125,11 @@ def bci_rows(raw_root: Path) -> tuple[list[dict[str, object]], dict[str, object]
                 "source_files": files,
             }
         )
-    return rows, {"subjects": dict(Counter(groups.values())), "rows": len(rows)}
+    return rows, {
+        "subjects": dict(Counter(groups.values())),
+        "rows": len(rows),
+        "split_name": split_name,
+    }
 
 
 def physionet_rows(raw_root: Path) -> tuple[list[dict[str, object]], dict[str, object]]:
@@ -287,17 +310,21 @@ def main() -> None:
             f"refusing to overwrite immutable manifest set; already exists: {existing}"
         )
 
-    builders = {
-        "bciciv2a": bci_rows,
-        "physionet_mi": physionet_rows,
-        "sleep_edf_sc": sleep_rows,
+    built = {
+        "bciciv2a": bci_rows(args.raw_root, args.bci_split_config),
+        "physionet_mi": physionet_rows(args.raw_root),
+        "sleep_edf_sc": sleep_rows(args.raw_root),
     }
-    built = {name: builder(args.raw_root) for name, builder in builders.items()}
     manifest_index: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "manifest_version": args.output.name,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "sleep_split_seed": 20260813,
+        "bci_split_config": (
+            relative(args.bci_split_config)
+            if args.bci_split_config is not None
+            else "configs/datasets/bciciv2a.yaml#split.main"
+        ),
         "configs": {
             relative(path): sha256_file(path)
             for path in (
