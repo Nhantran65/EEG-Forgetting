@@ -1,0 +1,93 @@
+schema_version: 1
+id: directional_interference_v2
+status: locked_analysis
+seeds: [3407, 42, 2026]
+tasks: [bciciv2a, physionet_mi, sleep_edf_sc]
+model:
+  plastic_final_encoder_blocks: 4
+sampling:
+  split: train
+  samples_per_task: 1024
+  batch_size: 64
+  sample_seed_by_task:
+    bciciv2a: 20260821
+    physionet_mi: 20260822
+    sleep_edf_sc: 20260823
+metrics:
+  signed_gradient: mean_observed_label_nll_gradient_at_old_task_checkpoint
+  conflict_score: negative_cosine_old_and_new_task_backbone_gradients
+  update_drift: exact_stage_two_minus_stage_one_shared_backbone_parameters
+  fisher_weighting: l2_within_encoder_layer_then_global_weighted_mean
+  interpretation: positive_conflict_means_first_order_new_task_step_increases_old_loss
+fisher:
+  tasks:
+    bciciv2a:
+      path: results/fisher/instrument_v1/bciciv2a/seed-3407/full.pt
+      sha256: 0862efbdf7579ffceb1e8eea8bb1158132ad8165850036056e7f5567a72e18fb
+    physionet_mi:
+      path: results/fisher/instrument_v1/physionet_mi/seed-3407/full.pt
+      sha256: 96c1f3d9fa231538cd0a3b6e55567328373c75a03b5f06eda19aa5d703d49e73
+    sleep_edf_sc:
+      path: results/fisher/instrument_v1/sleep_edf_sc/seed-3407/full.pt
+      sha256: 5fab20aaa062d52f238fea31129025aa0c28213240bc57d891c4320668e1590e
+  overlap_summary_path: results/fisher/instrument_v1/summary.json
+  overlap_summary_sha256: 4c9b73fd0701ea00ecf4462aa254d1f99c75ec895e630f70e8659dfa829e9936
+directions:
+  bci_to_physionet:
+    old_task: bciciv2a
+    new_task: physionet_mi
+    result_pattern: results/continual/sequential_ft_v1/forward/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: eb38e54a2ffcdd6155cedb6d12f781aa9730e36117fdff92ccec10b4013addfb
+      42: c64e7fc604a30ad2329ccbb1b2a5c5e535c649c8919740af3b3ccab9dd6a56f2
+      2026: 0347d58c35f2654c0078e8c281cdef855f5921a4990ed77771c56157b20b585c
+  physionet_to_bci:
+    old_task: physionet_mi
+    new_task: bciciv2a
+    result_pattern: results/continual/sequential_ft_v1/challenging/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: 9787680277c1ad95778949377435cc68e69097c0a56d3ece9145b0200229c743
+      42: 519f994d81acb6c8e0c0ff2c65b385b503b2a976bd32c29b990ede710c218d96
+      2026: 93a7925fb10eedd300e3b7bd4a312ea25bd87ffb66f17ec2e5dc87ecb60279f7
+  bci_to_sleep:
+    old_task: bciciv2a
+    new_task: sleep_edf_sc
+    result_pattern: results/continual/sequential_pairwise_clean_v1/bci_to_sleep/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: c01098d4d9d834d6dbd02aeed2238dee0b78a9753c309c672d5ba8a6c6ebfaf0
+      42: 81ed6579148704869fd4b727bddae69c01c502b9756004d7ef8d4cbbc59417e3
+      2026: add86e23dd4333d87ed8dba6a734ac03a3bd5cd9289dfd66a269ffd4e389dac6
+  sleep_to_bci:
+    old_task: sleep_edf_sc
+    new_task: bciciv2a
+    result_pattern: results/continual/sequential_pairwise_clean_v1/sleep_to_bci/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: 26de1404b59ca564e9cedf485fce0ca31c293a8b60f28f8e6de01692700bd0ae
+      42: f5304538d2a85f3161408c8dde41a7d285d5a4cdcabad03842654eb2bd9e9ca3
+      2026: 1fe6a692afa5b9833b8e55cf579a1887ce4c72e56579ce596c754e47863d7b1a
+  physionet_to_sleep:
+    old_task: physionet_mi
+    new_task: sleep_edf_sc
+    result_pattern: results/continual/sequential_pairwise_clean_v1/physionet_to_sleep/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: e3a07383a6734f3d7fa8f043e635905a8ca8e562e29dd5fce89ab537497d044d
+      42: 67b9fdf6545ce4a6725e131fe082c6cdb83f4d9c5e5a8f2e7b39703be09479f3
+      2026: 680494eff14362a01226e6c7277a499714d667ae1d292d862d6d89db98e96d25
+  sleep_to_physionet:
+    old_task: sleep_edf_sc
+    new_task: physionet_mi
+    result_pattern: results/continual/sequential_ft_v1/reverse/seed-{seed}/result.json
+    result_sha256_by_seed:
+      3407: 036b0e1f03ae926cb41ceb4ea36debfe02a776b4d44accd533b20be062f1f6ce
+      42: 27bc8df97369f73c371a4892b4087e78a09581fd5a05fb8403dc3cf019420e75
+      2026: 0778beed140029e49de9e0a7382cf114e110fb0563ad1edaf01187bf7c529bbd
+analysis:
+  aggregate_unit: direction_mean_across_three_training_seeds
+  primary_comparison: correlation_with_path_free_relative_forgetting
+  descriptive_only_because_six_directed_transitions: true
+recovery:
+  supersedes: directional_interference_v1
+  rejected_config_sha256: 892bcfc0bef8c5038fd3d93bb6ab901a3f11dbb015eb4797ca2d6dc2e4a6c4bb
+  reason: copied_result_digest_typo_for_physionet_to_bci_seed_2026
+  retained_partial_results: results/analysis/directional_interference_v1
+purpose: test_whether_directional_conflict_and_actual_sensitive_parameter_drift_explain_fisher_overlap_prediction_failure

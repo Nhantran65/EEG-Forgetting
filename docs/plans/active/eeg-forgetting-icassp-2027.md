@@ -353,6 +353,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - Directional audit chạy đủ sáu transition × ba seed tại checkpoint old-task. Mỗi task dùng cố định 1.024 mẫu train để đo signed mean observed-label NLL gradient trên bốn encoder block plastic. Báo negative gradient cosine như conflict score, cùng exact post-training parameter drift được weighted bởi old-task Fisher và geometric-mean shared Fisher.
 - Directional audit chỉ mang vai trò descriptive/mechanistic vì có sáu transition; không dùng p-value hoặc claim predictor tổng quát từ sáu điểm này.
 - `eeg-replication-gpu0` chạy ratio 5% rồi ba hướng directional đầu trên physical GPU 0; `eeg-replication-gpu2` chạy ratio 10% rồi ba hướng còn lại trên physical GPU 2. `eeg-replication-summary` chờ đủ 24 + 18 result và tạo hai summary có digest verification.
+- Recovery 2026-08-14: intervention hoàn tất 24/24. Directional v1 dừng ở 14/18 do checksum của `physionet_to_bci/seed-2026` bị chép sai trong config (`892bcf...`). Giữ nguyên partial artifacts v1 làm audit trail; v2 chỉ sửa đúng digest nguồn, bind rõ v1 bị supersede và chạy lại đủ 18 result, không trộn hai config SHA trong summary.
 - [ ] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành Week 3 diagnostic/intervention gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
