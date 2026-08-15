@@ -178,7 +178,7 @@ def predict_spectral_masks(
     device: torch.device,
 ) -> dict[str, object]:
     """Predict a fixed row set under one or more channel-band masks."""
-    if cell_weights.ndim != 3 or not indices:
+    if cell_weights.ndim != 3 or len(indices) == 0:
         raise DatasetProtocolError("mask prediction needs (mask, channel, band) weights")
     if batch_size <= 0 or mask_chunk_size <= 0:
         raise DatasetProtocolError("mask prediction batch sizes must be positive")
@@ -329,7 +329,7 @@ def integrated_gradients_dataset(
     alpha_chunk_size: int,
     device: torch.device,
 ) -> dict[str, object]:
-    if not indices or batch_size <= 0:
+    if len(indices) == 0 or batch_size <= 0:
         raise DatasetProtocolError("IG dataset evaluation needs rows and a positive batch")
     loader = DataLoader(
         Subset(dataset, list(indices)),

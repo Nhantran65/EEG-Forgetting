@@ -90,3 +90,29 @@ def test_spectral_mask_ig_has_finite_attribution_and_small_completeness_error() 
     assert torch.isfinite(attribution).all()
     assert attribution[0, 0, 1] > attribution[0, 0, 0]
     assert error.abs().max() < 1e-4
+
+
+def test_numpy_index_array_is_accepted_by_dataset_instruments() -> None:
+    class _Dataset(torch.utils.data.Dataset):
+        def __len__(self) -> int:
+            return 1
+
+        def __getitem__(self, index: int):
+            assert index == 0
+            return torch.zeros(1, 4, 200), torch.tensor(0), "A"
+
+    from eeg_forgetting.xai.explanation_drift import predict_spectral_masks
+
+    result = predict_spectral_masks(
+        _BandEnergyModel(),
+        "task",
+        _Dataset(),
+        np.asarray([0]),
+        torch.ones(1, 1, len(BANDS)),
+        sampling_rate_hz=200.0,
+        bands=BANDS,
+        batch_size=1,
+        mask_chunk_size=1,
+        device=torch.device("cpu"),
+    )
+    assert result["predictions"].shape == (1, 1)

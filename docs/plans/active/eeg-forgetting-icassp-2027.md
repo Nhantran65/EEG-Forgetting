@@ -406,6 +406,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: Occlusion ranking fit và fidelity gate dùng hai nửa class-stratified, frozen trong validation subjects. Test subjects không được đọc trong pilot và chỉ dùng final reporting sau protocol lock. Primary drift là JSD của positive L1-normalized subject maps; cells/trials không phải inference units.
 - 2026-08-15: XAI pilot config bind exact BCI-only/post-Sleep/joint checkpoint SHA, validation/test-cache SHA và deterministic validation assignment SHA. Validation A06/A07 được khóa thành 489 `attribution_fit` + 493 `attribution_gate`; pilot có 22 channel × 5 band = 110 cell. Fidelity/IG bắt buộc pass ở before và after; joint được report nhưng không dùng để làm fail gate.
 - 2026-08-15: Legacy high-overlap artifacts thiếu `old_task/new_task` chỉ được reader chấp nhận khi config SHA, Fisher task keys và evaluation task keys cùng khớp. Official old-importance summary pass 3/4 final test controls, nên claim gate vẫn fail và kết luận negative audit không đổi.
+- 2026-08-15: Pilot launch đầu tiên hoàn tất immutable `before` cell predictions rồi dừng ở fidelity vì NumPy array không có scalar truth value trong empty-index guard. Technical correction duy nhất đổi `not indices` thành `len(indices) == 0`, thêm regression test và không thay đổi config, operator, split, threshold hay artifact đã tính.
 
 ## Validation
 
@@ -439,7 +440,7 @@ Existing foundation proof completed on 2026-08-13/14:
 - Frozen test caches were materialized and bound to manifest v3: BCI 1.036 samples/2 subjects, PhysioNet 1.530/17 and Sleep 37.227/15. Full source-checksum manifest audit passed immediately before launching sequential FT.
 - Sequential FT completed 9/9 immutable runs (three orders × three seeds). The predeclared stability gate passed with six signal-bearing and six sign-consistent directed transitions; the summary binds every input result by SHA-256.
 - EWC and DER++ each completed 9/9 immutable runs. Recomputed summaries verified every stage/checkpoint/prediction digest. Peak persistent state was 25,766,400 bytes for two offline-EWC Fisher/anchor states and 8,381,067 bytes for DER++'s 119-slot reservoir.
-- XAI implementation validation: locked-config dry run strict-loaded all three pilot checkpoints and verified 982 validation rows, frozen 489/493 split, 110-cell registry and all cache/checkpoint/config digests. Full repository suite passed `96 passed`; focused proof covers continuous-trial rFFT reconstruction, exact band removal, subject-equal reliance, base-2 JSD, spectral-mask IG completeness and legacy-summary compatibility.
+- XAI implementation validation: locked-config dry run strict-loaded all three pilot checkpoints and verified 982 validation rows, frozen 489/493 split, 110-cell registry and all cache/checkpoint/config digests. Full repository suite passed `97 passed`; focused proof covers continuous-trial rFFT reconstruction, exact band removal, NumPy frozen-index handling, subject-equal reliance, base-2 JSD, spectral-mask IG completeness and legacy-summary compatibility.
 
 ## Result
 
