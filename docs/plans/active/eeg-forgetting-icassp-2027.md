@@ -1,6 +1,7 @@
-# Execution Plan: Diagnostic Catastrophic Forgetting in EEG Foundation Models
+# Execution Plan: Channel–Frequency Explanation Drift in Continual EEG Foundation Models
 
 Date: 2026-08-13
+Last updated: 2026-08-15
 
 ## Status
 
@@ -10,63 +11,65 @@ Active
 
 Hoàn thành một submission ICASSP 2027 dài 4 trang kỹ thuật (+ trang tài liệu tham khảo nếu cần), kiểm tra câu hỏi:
 
-> Mức chồng lấn quan trọng giữa các task EEG, đo trước chuỗi continual learning, có liên hệ với mức catastrophic forgetting về sau hay không?
+> Khi CBraMod học tuần tự các EEG task khác paradigm, bằng chứng channel–frequency mà model dùng cho task cũ thay đổi như thế nào, và việc giữ hiệu năng có đồng nghĩa với giữ cách model sử dụng tín hiệu sinh lý hay không?
 
-Bài không đề xuất phương pháp continual-learning mới. Đóng góp chính là một chẩn đoán có kiểm chứng can thiệp:
+Bài không đề xuất phương pháp continual-learning mới. Đóng góp dự kiến:
 
-1. Đo overlap tham số bằng Fisher importance từ các mô hình single-task độc lập, cùng khởi tạo từ CBraMod pretrained.
-2. Liên hệ overlap với pairwise relative forgetting qua ba task EEG đã có và TUEV nếu quyền truy cập hoàn tất đúng hạn.
-3. Kiểm chứng vị trí tham số bằng high-overlap freeze so với random-freeze tại mức hiệu năng task mới tương đương.
-4. Grounding kết quả bằng một panel nhỏ channel–frequency đặc thù EEG.
+1. Xây dựng channel–frequency reliance map bằng held-out occlusion trên cùng subject/mẫu trước và sau mỗi lần chuyển task.
+2. Định nghĩa và đo physiological explanation drift (PED), rồi đối chiếu PED với relative forgetting mà không coi accuracy là đại diện cho explanation stability.
+3. Kiểm tra liệu Sequential FT, EWC và DER++ có bảo tồn explanation tương ứng với mức bảo tồn hiệu năng hay không; joint training chỉ là offline reference.
+4. Kiểm chứng độ tin cậy của attribution bằng random-occlusion fidelity, split/bootstrap null và Integrated Gradients rank agreement trước khi scale.
 
 Deadline mục tiêu: 2026-09-16.
 
 ## Context
 
 - [Plan ban đầu](../../../plan%20new%20paper.md) là nguồn ý tưởng; file này thay thế nó làm execution plan hiện hành.
-- Qian et al., *Learn and Don't Forget: Adding a New Language to ASR Foundation Models*, đã dùng Fisher overlap để dự báo nguy cơ quên ngôn ngữ trong Whisper. Vì phân tích của họ về bản chất đã mang tính prospective, “prospective overlap” không được xem là novelty độc lập: <https://www.isca-archive.org/interspeech_2024/qian24_interspeech.pdf>.
-- EvoBrain dùng spectral affinity để điều khiển transfer. Delta của bài này là dùng overlap để chẩn đoán/giải thích forgetting và kiểm chứng bằng can thiệp, không dùng affinity để tạo một CL method mới: <https://arxiv.org/abs/2606.01767>.
+- CL infrastructure đã hoàn tất: CBraMod, ba dataset, ba order, ba seed, Sequential FT/EWC/DER++, joint reference, BCI split robustness, immutable checkpoints và subject-level predictions.
+- Fisher instrument đo ổn định nhưng không ủng hộ hypothesis `overlap cao -> quên nhiều`; directional gradient/drift không cải thiện khả năng giải thích. High-overlap freeze thắng random nhưng final `old_only` control không cho thấy shared overlap thêm lợi ích nhất quán ngoài Fisher của task cũ. Toàn bộ nhánh này được đóng băng làm secondary negative audit, không còn là headline.
+- CLEX đã nghiên cứu explanation drift trong continual learning tổng quát; novelty ở đây không phải khái niệm drift riêng lẻ mà là drift có cấu trúc sinh lý channel–frequency trong cross-paradigm EEG foundation-model adaptation: <https://www.sciencedirect.com/science/article/pii/S0925231224007318>.
+- XAI tĩnh trên EEG foundation models đã có, gồm AttnLRP và causal feature audit; bài không claim “XAI cho EEG-FM đầu tiên”: <https://arxiv.org/abs/2605.17562>, <https://arxiv.org/abs/2605.11410>.
+- EvoBrain là phương pháp continual EEG-FM và phải được nêu đích danh; bài này nằm ở lớp lifetime explainability, không reimplement EvoBrain và không đề xuất cơ chế CL mới: <https://arxiv.org/abs/2606.01767>.
 - Audit trực tiếp VEP cho thấy 0 marker trong 64 JSON, 0 annotation trong 63 EDF, và phase-crossover BA xấp xỉ chance 0,25. VEP bị quarantine khỏi RQ2, CL matrix và physiological claims; manifest/adapter cũ vẫn được giữ để audit paper trước.
-- TUEV là task thứ tư có điều kiện. Preprocessing phải tái dùng đúng code CBraMod commit `b9e961003214326972c567eff390e75b0287e32a`; output thực tế là 16 TCP bipolar channel x 5 patch x 200 điểm, không phải 23 channel model input.
 - Ba dataset công khai đã được materialize dưới `data/raw/`: BCI IV-2a có 18 GDF + official true labels, PhysioNet-MI có 109 x 6 imagery-run EDF, Sleep Cassette có 153 cặp PSG/hypnogram trên 78 subject. Checksum/ZIP CRC và source-level annotation audit đều pass.
 - Quy định ICASSP: 4 trang nội dung kỹ thuật, trang thứ năm chỉ dành cho references: <https://2027.ieeeicassp.org/publishing-and-paper-presentation-options/>.
 
 ## Research Questions And Claims
 
-### RQ chính
+### RQ1 — Explanation drift
 
-Overlap Fisher giữa task `i` và `j` có liên hệ với mức quên tương đối `F_rel(i <- j)` sau khi học `j` không?
+Sau khi học task mới `j`, channel–frequency reliance map của task cũ `i` thay đổi bao nhiêu so với checkpoint ngay trước `j` và offline joint reference?
 
-Claim tối đa được phép nếu kết quả ủng hộ:
+### RQ2 — Performance–explanation alignment
 
-> Pre-CL parameter-importance overlap is associated with pairwise forgetting within this heterogeneous EEG benchmark.
+Việc EWC/DER++ giảm performance forgetting có đồng thời giảm explanation drift so với Sequential FT không, hay accuracy retention và explanation retention tách rời?
 
-Không claim universal predictor, không claim causality chỉ từ correlation, và không claim “first”.
+Hai outcome đều có giá trị nếu attribution gates pass:
 
-### RQ hỗ trợ
+- PED tăng cùng `F_rel`: forgetting về hiệu năng đi cùng thay đổi bằng chứng sinh lý.
+- PED vẫn lớn khi `F_rel` nhỏ: accuracy đơn thuần không đủ đánh giá continual EEG model.
 
-- Những vùng kênh–tần số nào đóng góp cho từng task?
-- Tại cùng mức học task mới, freeze vùng high-overlap có bảo vệ task cũ tốt hơn random-freeze cùng layer và cùng số lượng tham số không?
+Không claim attribution là biological engram, không claim PED là nguyên nhân của forgetting, không claim universal relation, và không claim “first” nếu chưa có systematic literature review đầy đủ.
 
 ### Positioning trong Intro
 
 Thông điệp delta dự kiến:
 
-> Prior work used Fisher overlap to anticipate language forgetting in Whisper. We investigate whether this diagnostic generalizes to heterogeneous EEG tasks, ground interference in channel–frequency structure, and validate implicated parameters through matched-plasticity interventions.
+> Prior work proposes methods for continual EEG foundation-model adaptation and separately studies static EEG-FM interpretability. We instead ask whether the physiologically structured evidence behind old-task predictions remains stable throughout continual adaptation.
 
-EvoBrain phải được nêu riêng: họ dùng spectral affinity để điều khiển transfer; bài này phân tích overlap như diagnostic và không đề xuất cơ chế CL mới.
+EvoBrain phải được nêu riêng: họ đề xuất cơ chế continual EEG; bài này phân tích explanation lifetime của các CL baseline đã khóa và không đề xuất cơ chế CL mới.
 
 ## Scope
 
 In scope:
 
 - Một backbone duy nhất: CBraMod.
-- Ba task chắc chắn: BCI Competition IV-2a, PhysioNet-MI và Sleep-EDF Expanded; TUEV là task thứ tư nếu có dữ liệu chạy được trước 2026-08-19.
-- Main methods: sequential fine-tuning, EWC, DER++, và joint training làm upper bound.
-- EvoBrain chỉ giữ nếu reproduce được trước cổng cuối Tuần 2.
-- Một plasticity depth chính, chọn từ sweep 1/2/4/8 block.
-- Ba task order được thiết kế để phủ cả hai chiều của mọi cặp task, ba seed.
-- Occlusion là XAI chính; Integrated Gradients là kiểm tra hội tụ.
+- Ba task đã khóa: BCI Competition IV-2a, PhysioNet-MI và Sleep-EDF Expanded.
+- Tái dùng immutable checkpoints của Sequential FT, EWC, DER++ qua ba task order và ba seed; không train lại main CL matrix.
+- Joint training là offline explanation reference, không phải continual method.
+- Pilot bắt buộc: direct BCI→Sleep, seed 3407, single-task BCI trước transition, Sequential sau Sleep và joint reference.
+- Occlusion channel×frequency là XAI chính; Integrated Gradients trên spectral mask coefficients chỉ là kiểm tra rank agreement.
+- Reliance/drift luôn so trong cùng task và cùng montage; không so trực tiếp spatial cell giữa Sleep và MI.
 - Hai hình và một bảng trong main paper.
 
 Out of scope:
@@ -75,11 +78,13 @@ Out of scope:
 - Đề xuất CL algorithm mới.
 - Adapter riêng theo task trong main experiment.
 - Learned Conv1D channel mapping.
-- Full cross-validation cho mọi method/order/seed.
-- Full attribution-drift analysis D3.
-- Grad-CAM, PhysioNet 64-channel, class-balanced replay và replay-method intervention, trừ khi còn thời gian.
+- Bất kỳ model retraining hoặc CL method mới.
+- TUEV, VEP, EvoBrain reimplementation và dataset thứ tư.
+- Fisher overlap, directional gradient/drift và parameter-freeze intervention trong main claim; chúng chỉ còn là frozen secondary audit/repository artifact.
+- Grad-CAM, full per-class attribution atlas, PhysioNet 64-channel và attribution-guided mitigation.
+- Method shopping nếu IG/occlusion gate fail.
 - Cohort split giả lập thành nhiều task.
-- VEP trong main RQ2, continual-learning matrix hoặc physiological claims.
+- Dùng chữ “engram” cho post-hoc attribution map.
 
 ## Dataset Protocol
 
@@ -87,8 +92,7 @@ Out of scope:
 |---|---|---:|---|
 | BCI IV-2a | 4-class motor imagery, 22 kênh | 9 | MI low-subject; cần split robustness riêng |
 | PhysioNet-MI | Runs 04/06/08/10/12/14, bỏ T0, 4-class theo run; main dùng 22 kênh khớp BCI IV-2a; clean split giữ 105 subject | 105 main / 109 reproduction | Cặp cùng paradigm, khác dataset |
-| Sleep-EDF Expanded | 5-class sleep staging, 30 giây, bipolar | 78 | Task khác paradigm; chỉ tham gia cross-task spectral analysis |
-| TUEV v2.0.0 | 6-class event classification, 16 TCP bipolar, cửa sổ 5 giây | access pending | Task thứ tư nếu tải và preprocess chạy được đúng hạn |
+| Sleep-EDF Expanded | 5-class sleep staging, 30 giây, bipolar | 78 | Task khác paradigm; reliance/drift chỉ so trong montage Sleep |
 
 ### VEP quarantine
 
@@ -103,9 +107,7 @@ Out of scope:
 - Dùng channel registry và canonical order cố định. Không dùng learned Conv1D để ánh xạ montage.
 - Verify CBraMod downstream code nhận số kênh thay đổi. Nếu hard-code, dùng pad-and-mask vào registry chung.
 - PhysioNet main dùng tập 22 kênh tương ứng BCI IV-2a; bản 64 kênh chỉ là robustness optional.
-- Sleep-EDF bipolar không được chiếu thành vị trí điện cực giả. Cross-task channel-space analysis giới hạn ở montage có ý nghĩa; Sleep chỉ so trong frequency space.
-- TUEV giữ đúng 16 TCP bipolar derivation từ preprocessing CBraMod đã pin; không tự viết lại pipeline 23-to-16.
-- TUEV có một reference reproduction giữ nguyên filter upstream 0,3–75 Hz + notch 60 Hz. Main harmonized giữ nguyên montage/event/split code nhưng đổi filter trên raw liên tục thành 0,5–40 Hz trước khi cắt event; không refilter cửa sổ 5 giây.
+- Sleep-EDF bipolar không được chiếu thành vị trí điện cực giả. PED luôn là before/after comparison trong cùng task nên không cần giả lập spatial correspondence giữa Sleep và MI.
 - Với cửa sổ 1 giây, tránh diễn giải mạnh năng lượng rất thấp dưới khoảng 2 Hz.
 
 ## Model And Training Design
@@ -114,19 +116,18 @@ Out of scope:
 - Khi chuyển task, head cũ được đóng băng; backbone vẫn là phần có thể bị ghi đè.
 - Không dùng task-specific adapter trong main experiment.
 - Sweep nhanh unfreeze `1/2/4/8` block cuối bằng sequential FT trên một order và một seed.
-- Đồng thời chạy single-task baselines cho mọi task có trong benchmark đã khóa sau deadline TUEV. Chọn một depth duy nhất: depth nhỏ nhất đạt ít nhất 95% best mean normalized validation BA qua các task đó. Không chọn depth dựa trên mức forgetting.
+- Single-task baselines và depth selection đã khóa. Main dùng depth nhỏ nhất đạt ít nhất 95% best mean normalized validation BA qua ba task, không chọn depth dựa trên forgetting hoặc attribution.
 - Khóa common preprocessing, optimizer family, schedule và validation budget sau pilot.
-- Tách single-task run thành (a) converged/early-stopped cho Week-1 gate và trần `F_rel`, và (b) budget-matched đúng 2.500 optimizer step cho Fisher/overlap và đối chiếu CL.
+- Tách single-task run thành (a) converged/early-stopped cho external performance gate và (b) budget-matched đúng 2.500 optimizer step làm source/reference cho CL trajectory.
 - Log validation curve BCI IV-2a mỗi 100 step tới 2.500 để biết checkpoint budget-matched nằm trước hay sau peak.
 - Method-specific hyperparameter được tune với cùng validation budget; không tune lại theo order/seed.
 
 Main methods:
 
-1. Sequential FT: baseline gây quên và nền sạch cho causal intervention.
+1. Sequential FT: baseline gây quên.
 2. EWC: regularization baseline; memory accounting gồm Fisher và `theta*` cho toàn bộ tham số plastic.
 3. DER++: replay baseline, giữ reservoir policy gốc.
-4. Joint training: upper bound, không đưa vào diễn giải như continual method.
-5. EvoBrain: optional; bỏ khỏi experiment nếu chưa reproduce đúng trước cuối Tuần 2.
+4. Joint training: offline performance/explanation reference, không đưa vào diễn giải như continual method.
 
 ### Replay fairness
 
@@ -163,50 +164,54 @@ Metric chính chuẩn hóa theo headroom:
 - Flag hoặc loại theo quy tắc predeclared nếu mẫu số gần chance; không âm thầm clip.
 - Lưu prediction và metric per subject. Đây là repeated measurement, không biến subject thành task-pair độc lập.
 
-### Prospective task overlap
+### Channel–frequency reliance map
 
-- Train single-task models độc lập từ cùng pretrained CBraMod, cùng selected depth và protocol.
-- Tính diagonal empirical Fisher importance trên shared-backbone parameters; không đưa task head vào overlap.
-- Instrument pilot dùng exact per-example gradient của observed-label NLL trên 1.024 mẫu train lấy đều không hoàn lại từ natural distribution. Chỉ bốn encoder block plastic được đo; model ở eval mode. Hai nửa 512 mẫu rời nhau phải đạt cosine ít nhất 0,90 và cao hơn cross-task cosine lớn nhất ít nhất 0,05; nếu fail thì tăng 2.048 mẫu trước khi scale CL.
-- Normalize importance theo layer trước khi ghép để layer lớn không tự động chi phối.
-- Primary overlap: cosine similarity giữa hai Fisher-importance vector.
-- Sensitivity: top-k Jaccard và layer-wise overlap; `k` được predeclare từ validation, không chọn sau khi thấy correlation.
-- Instrument check: overlap cùng task qua seed/split phải ổn định và cao hơn rõ rệt overlap cross-task. Nếu không, dừng CL scale-up và sửa thước đo.
-- Qian et al. đã có prospective Fisher-overlap logic trong ASR; novelty không đặt ở riêng phép đo này.
+- Năm band cố định, dùng half-open interval trừ band cuối: delta `[0.5,4)`, theta `[4,8)`, alpha `[8,13)`, beta `[13,30)`, gamma `[30,40]` Hz.
+- Mỗi cached sample được nối các patch 1 giây về đúng continuous trial/epoch của nó trước rFFT, rồi reshape lại nguyên dạng sau inverse-rFFT; không FFT riêng từng patch.
+- Một cell là một cặp `(channel, band)`. Occlusion chính đặt hệ số rFFT của band đó về zero chỉ trên channel đó rồi inverse-rFFT; mọi channel/band khác giữ nguyên. Không refilter và không fit baseline từ test data.
+- Cell reliance của subject là `BA_unoccluded - BA_cell_occluded`; aggregation giữa subject là mean subject-level drop, không pool trial.
+- Validation sample IDs được khóa thành hai nửa class-stratified trong từng subject: `attribution_fit` để xếp hạng cell và `attribution_gate` để kiểm fidelity/PED null. Test subjects không được đọc trong pilot và chỉ dùng báo kết quả cuối sau khi toàn bộ protocol đã khóa.
+- Fidelity control: occlude top 20% cell xếp hạng trên `attribution_fit`, đánh giá trên `attribution_gate` và so với 100 random masks cùng số cell. Gate pilot yêu cầu subject-balanced BA drop của top mask lớn hơn percentile 95 của random controls.
+- Integrated Gradients được tính theo các hệ số spectral mask differentiable, từ all-zero tới all-one, cho true-class logit; positive attribution được aggregate theo subject rồi xếp hạng cùng cell registry.
+- IG là validation instrument, không phải contribution độc lập. Gate pilot yêu cầu Spearman rank agreement với occlusion ít nhất `0,30`.
 
-### Channel–frequency grounding
+### Physiological explanation drift
 
-- Primary: band/channel occlusion và mức giảm BA.
-- Validation: Integrated Gradients; so agreement theo rank, không yêu cầu trị tuyệt đối giống nhau.
-- Bands được predeclare trong 0,5–40 Hz; phương thức loại band phải giống nhau giữa task.
-- Cross-dataset spatial map dùng canonical anatomical regions/mask cho kênh thiếu; Sleep không tham gia spatial comparison.
-- Panel này dùng để định vị bài là EEG research, không gánh claim chính và chiếm tối đa khoảng 15% diện tích Hình 1.
+- Với old task `i` ngay trước và sau khi học new task `j`, đánh giá đúng cùng frozen subject/sample set.
+- Từ positive part của subject-level reliance map, L1-normalize thành phân bố `P_before` và `P_after`; fail loud nếu map không có positive mass.
+- Primary PED là Jensen–Shannon divergence `JSD(P_before, P_after)`. Secondary sensitivity là `1 - Spearman(rank_before, rank_after)`.
+- Offline alignment là `JSD(P_after, P_joint)` với joint checkpoint cùng seed và task.
+- Instrument-noise null được tạo bằng repeated split/bootstrap của cùng checkpoint và cùng subject. Gate pilot yêu cầu observed before/after PED lớn hơn percentile 95 của null nếu muốn claim explanation changed.
+- Mọi inference dùng subject, seed, order và directed transition làm đơn vị phù hợp; channel×frequency cell không phải independent sample.
+
+### Completed Fisher audit
+
+- Fisher split-half/cross-task instrument, overlap–forgetting, directional audit và high/random/old-only interventions được giữ immutable để audit/repository.
+- Main paper tối đa dùng một câu hoặc một small secondary statistic để giải thích lý do pivot; không dùng Fisher làm headline figure/RQ và không mở thêm experiment branch.
 
 ## Analysis Design
 
-- Bốn task tạo 6 cặp không hướng và tối đa 12 cặp có hướng.
-- Chọn ba order sao cho một order và reverse order phủ cả hai chiều của mọi cặp; order thứ ba cân bằng/challenging nhưng phải predeclare trước full run.
-- Primary visual: overlap vs subject-aggregated `F_rel`, hiển thị task pair, direction, method và uncertainty.
-- Hierarchical analysis giữ subject nested trong dataset và order/seed là repeated/random effects thích hợp.
-- Vì overlap chỉ thay đổi ở cấp task-pair, không dùng số subject để giả vờ tăng số task-pair độc lập. P-value là exploratory; báo effect size, interval và leave-one-pair-out sensitivity.
-- Kiểm tra xu hướng theo layer/depth; không chọn layer sau khi nhìn kết quả mà không ghi rõ exploratory.
-- Kết luận RQ2 phải ổn định về dấu và không do một cặp task duy nhất chi phối.
+- Ba task tạo sáu directed transition. Tái dùng ba order và ba seed đã khóa; không bổ sung order sau khi thấy PED.
+- Mỗi observation chính ghép `(method, order, seed, directed transition, old-task subject)` với `F_rel` và PED before/after trên cùng subject.
+- Primary visual: PED vs `F_rel`, màu theo Sequential/EWC/DER++, hiển thị transition và uncertainty theo subject/seed/order.
+- Primary method comparison ghép cùng order/seed/transition để hỏi phương pháp giảm `F_rel` có đồng thời giảm PED không.
+- Joint reference chỉ dùng đo offline alignment, không trộn vào continual-method comparison.
+- Báo raw `F`, `F_rel`, PED, rank-drift sensitivity và BCI split robustness. Không dùng số cell/trial để giả tăng sample size.
+- Case “accuracy retained nhưng PED lớn” phải được predefine bằng `|F_rel| <= 0,05` và PED vượt percentile 95 null; không chọn case chỉ vì heatmap đẹp.
+- Kết luận phải ổn định về hướng qua ít nhất hai task order và không phụ thuộc duy nhất một seed.
 
-## Causal Diagnostic Validation
+## Attribution Validation And Scale Gate
 
-Chạy trước trên sequential FT, ít nhất một cặp task hoàn thành trước cuối Tuần 3.
+Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
-1. Xếp hạng shared-backbone units/parameter groups theo overlap importance.
-2. Freeze một số tỷ lệ predeclared của high-overlap units khi học task mới.
-3. Control: random-freeze cùng layer, cùng số units/parameters; lặp ít nhất ba random masks.
-4. Đo đồng thời old-task forgetting và new-task BA.
-5. So sánh stability–plasticity Pareto hoặc nội suy tại matched new-task performance.
+1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
+2. Tạo cùng map tại Sequential checkpoint sau khi học Sleep.
+3. Tạo BCI map từ joint seed-3407 làm offline reference.
+4. Chạy held-out top-20%-vs-random fidelity gate.
+5. Chạy spectral-mask IG và rank-agreement gate.
+6. Ước lượng same-checkpoint bootstrap/split null rồi so observed PED.
 
-Claim can thiệp chỉ được dùng khi:
-
-> At matched new-task performance, freezing high-overlap parameters reduces forgetting more than freezing an equal number of randomly selected parameters in the same layers.
-
-Nếu còn ngân sách, xác nhận trên DER++; không cần chạy mọi method.
+Scale sang toàn bộ checkpoint hiện có chỉ khi cả ba gate pass: fidelity, IG agreement và observed PED vượt same-checkpoint null. PED không vượt null không làm attribution implementation sai, nhưng cấm claim explanation changed; khi đó dừng scale và báo pilot null. Mức performance forgetting chỉ chọn framing “coupled” hoặc “decoupled”, không được dùng để thay đổi attribution protocol.
 
 ## Paper Budget
 
@@ -219,74 +224,50 @@ Nếu còn ngân sách, xác nhận trên DER++; không cần chạy mọi metho
 
 Main artifacts:
 
-- Figure 1: overlap vs `F_rel`, kèm panel channel–frequency nhỏ.
-- Figure 2: stability–plasticity Pareto hoặc matched-performance causal comparison; đây là headline figure.
-- Table 1: task performance, BWT và total memory footprint.
+- Figure 1: protocol cùng reliance map before/after/delta của transition tiêu biểu được chọn bằng rule, không chọn bằng thẩm mỹ.
+- Figure 2: PED vs `F_rel` và paired method comparison; đây là headline figure.
+- Table 1: subject-aggregated performance forgetting, PED và offline alignment của Sequential/EWC/DER++.
 
 Không thêm hình thứ ba vào main paper.
 
 ## Approach And Schedule
 
-### Week 1 — 2026-08-13 to 2026-08-19: protocol and instrument
+### Foundation complete — 2026-08-13 to 2026-08-15
 
-- Khóa task definition, label mapping và split manifest cho cả bốn dataset.
-- Quarantine VEP theo kết quả marker/annotation/phase-crossover audit; audit riêng kết quả subject-disjoint cũ không chặn main work.
-- Xin quyền và tải TUEV v2.0.0; deadline cứng 2026-08-19, sau đó tiếp tục với ba task và hạ claim nếu chưa chạy được.
-- Verify CBraMod checkpoint, variable-channel behavior, patching và preprocessing.
-- Chạy linear probe và single-task FT baselines.
-- Chạy sweep FT 1/2/4/8 block nhanh; chọn một depth chính bằng validation rule.
-- Tạo Fisher-overlap signatures và kiểm tra same-task reproducibility.
-- Chạy sequential FT smoke test end-to-end.
+- Dataset/manifests/cache, CBraMod validation, depth/head selection, single-task references và full Sequential/EWC/DER++/joint matrices đã hoàn tất.
+- Fisher/directional/intervention branch đã trả lời hypothesis cũ và được frozen làm secondary audit.
 
-Gate cuối Tuần 1:
+### XAI protocol and pilot — 2026-08-15 to 2026-08-18
 
-- Performance hợp lý so với reference có cùng protocol, không dùng một ngưỡng công bố sai protocol.
-- Fine-tune phải tốt hơn linear probe đủ rõ để chứng minh phần plastic thực sự học.
-- Fisher overlap phải có độ phân giải: same-task qua seed/split ổn định và tách được cross-task.
-- Chạy một PhysioNet single-task reproduction với split CBraMod gốc 70/19/20 không lọc subject để kiểm tra chuỗi preprocessing-to-checkpoint từ bên ngoài.
+- Khóa config, spectral occlusion operator, cell registry, subject aggregation, PED và output schema.
+- Implement synthetic FFT reconstruction/one-cell removal tests, checkpoint identity verification và immutable result writer.
+- Chạy pilot BCI→Sleep seed 3407 trên BCI-only, post-Sleep Sequential và joint reference.
+- Chạy fidelity, IG agreement và bootstrap/split-null gates; không đọc test để chỉnh threshold/operator.
 
-### Week 2 — 2026-08-20 to 2026-08-26: continual-learning matrix
+Gate pilot:
 
-- Chạy FT, EWC, DER++ với 3 order x 3 seed ở selected depth.
-- Log `R[i,j,s]`, predictions, checkpoints và memory footprint.
-- Chạy split robustness thứ hai cho BCI IV-2a sớm.
-- Reproduce EvoBrain với deadline cứng.
+- Top-20% `attribution_gate` BA drop vượt percentile 95 của 100 random masks.
+- Occlusion–IG Spearman ít nhất `0,30`.
+- Observed before/after PED vượt percentile 95 của same-checkpoint bootstrap/split null.
+- Kết quả finite, deterministic và subject-level aggregation/mask identity được digest-bind.
 
-Gate giữa Tuần 2:
+### XAI scale — 2026-08-19 to 2026-08-23
 
-- Median `F_rel` phải vượt seed noise ở đa số directed transitions tại ít nhất một plasticity depth.
-- Dấu kết luận không được đảo hoàn toàn trên split BCI thứ hai.
-- Nếu fail: tăng depth đã predeclared hoặc dùng challenging order; không thêm task mới lúc này.
+- Nếu pilot pass, chạy full occlusion trên Sequential/EWC/DER++ qua ba order, ba seed và sáu directed transition từ checkpoint hiện có.
+- Chạy IG validation trên một representative transition cho mỗi old task qua ba seed; selection rule phải khóa trước khi mở kết quả.
+- Tạo joint-reference map cho ba task/ba seed và PED/offline-alignment summary có digest verification.
 
-Gate cuối Tuần 2:
+### Analysis and figures — 2026-08-24 to 2026-08-28
 
-- EvoBrain reproduce đúng thì giữ; nếu không, bỏ khỏi experiments và chuyển sang Related Work.
+- Ghép subject-level `F_rel`, PED, method/order/seed; chạy paired comparison, raw-`F`, rank-drift và BCI split sensitivity.
+- Chốt framing coupled hoặc decoupled theo rule đã khóa.
+- Hoàn thiện hai figures + một table và draft Method/Setup.
 
-### Week 3 — 2026-08-27 to 2026-09-02: diagnostic and intervention
+### Full draft and review — 2026-08-29 to 2026-09-09
 
-- Hoàn tất overlap extraction và pairwise `F_rel` dataset.
-- Chạy occlusion; IG chỉ để rank-convergence validation.
-- Hoàn thành causal intervention trên ít nhất một cặp với sequential FT.
-- Bắt đầu Figure 1, Figure 2 và draft Method/Setup.
-
-Gate cuối Tuần 3:
-
-- Occlusion và IG phải đồng thuận ở mức rank đủ để dùng panel EEG.
-- Causal intervention phải hoàn thành trên ít nhất một cặp.
-- Nếu thiếu thời gian, cắt breadth của channel–frequency/IG và mọi D3 còn lại; không cắt intervention.
-
-### Week 4 — 2026-09-03 to 2026-09-09: analysis and full draft
-
-- Fit hierarchical/descriptive analyses, uncertainty và leave-one-pair-out checks.
-- Hoàn thiện 2 figures + 1 table.
-- Viết full four-page draft; nêu Qian và EvoBrain delta trực tiếp.
-- Internal review tập trung claim strength, leakage và page budget.
-
-Gate cuối Tuần 4:
-
-- Nếu RQ2 ổn định qua layer/condition: dùng cautious association claim.
-- Nếu RQ2 yếu/null: báo null có giới hạn trong benchmark đã khóa; giữ causal intervention làm headline nếu nó thành công.
-- Nếu cả association và intervention đều fail: không claim predictor; đánh giá chuyển journal hoặc reframing trước khi nộp.
+- Viết full four-page draft; nêu CLEX, static EEG-FM XAI và EvoBrain delta trực tiếp.
+- Internal review tập trung attribution validity, claim strength, leakage và page budget.
+- Nếu pilot attribution fail sau một technical correction, dừng XAI scale và quyết định submit Fisher negative audit hay không; không method-shop để cứu deadline.
 
 ### Submission buffer — 2026-09-10 to 2026-09-16
 
@@ -295,16 +276,17 @@ Gate cuối Tuần 4:
 
 ## Risks And Recovery
 
-- **Novelty overlap với Qian:** cite trực tiếp; novelty dựa vào EEG grounding + systematic sequential benchmark + matched causal intervention.
-- **TUEV access/dung lượng:** deadline cứng 2026-08-19; nếu chưa có snapshot chạy được thì khóa benchmark ba task và hạ claim, không để dataset thứ tư làm trôi lịch.
+- **Static EEG-FM XAI đã đông:** không bán channel–frequency heatmap riêng lẻ; novelty phải nằm ở explanation lifetime/drift trong cross-task continual adaptation.
+- **Explanation drift đã có ở domain khác:** cite CLEX trực tiếp; delta là physiological cell structure, EEG-FM, heterogeneous task transition và performance–explanation alignment.
+- **Attribution không faithful:** pilot held-out top-vs-random là hard gate; fail sau một technical correction thì dừng scale, không đổi explainer sau khi nhìn kết quả.
+- **IG baseline/gradient bất ổn:** IG chỉ là validation. Non-finite hoặc implementation-invalid được sửa một lần bằng cùng predeclared spectral-mask formulation; scientific disagreement với occlusion là gate fail, không phải lý do method-shop.
+- **Drift giả do đổi mẫu/class composition:** before/after dùng đúng cùng sample IDs, subject-balanced và class-stratified reporting; không so heatmap tạo từ cohort khác nhau.
+- **Montage khác nhau:** chỉ đo drift trong cùng old task; không so trực tiếp cell Sleep với cell MI hay chiếu bipolar thành scalp location giả.
 - **VEP recording-level confound:** đã quarantine khỏi main; audit legacy subject-disjoint result là workstream riêng.
 - **BCI IV-2a chỉ 9 subject:** per-subject logging và split robustness sớm; không giả vờ tăng power bằng epoch count.
-- **Overlap có ít independent task pairs:** effect size, interval, leave-one-pair-out và cautious claim; không quảng bá universal prediction.
-- **Forgetting quá nhỏ:** plasticity-depth sweep và challenging order đã predeclare.
-- **EvoBrain tốn thời gian:** deadline cứng cuối Tuần 2, sau đó drop.
-- **Page overflow:** 2 figures + 1 table; D3/Grad-CAM/extra montage để supplementary hoặc bỏ.
-- **Compute failure:** ưu tiên FT -> causal intervention -> EWC/DER++ -> XAI breadth -> EvoBrain.
-- **RQ2 null:** báo đúng giới hạn; không đổi metric/layer hậu nghiệm để săn correlation.
+- **Performance forgetting nhỏ:** nếu PED vượt null khi `|F_rel| <= 0,05`, dùng decoupling finding; nếu cả PED và forgetting đều null thì báo null và không chọn transition hậu nghiệm.
+- **Page overflow:** giữ đúng 2 figures + 1 table; Fisher audit, per-class atlas, full random distributions và extra montage để repository/supplementary hoặc bỏ.
+- **Compute failure:** ưu tiên pilot fidelity -> full occlusion -> PED summary -> selected IG validation; không train thêm model.
 
 Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result đã hoàn thành; thay dataset/method chỉ bằng config/version mới, không ghi đè run cũ.
 
@@ -340,14 +322,16 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
 - [x] Chạy PhysioNet→BCI localization replication 5/10% × bốn mask × ba seed.
 - [x] Chạy directional gradient/drift audit sáu transition × ba seed và tổng hợp descriptive correlation.
-- [ ] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run).
+- [x] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run); official summary còn cần legacy-schema compatibility fix.
+- [x] Chốt pivot từ Fisher-overlap headline sang channel–frequency explanation drift.
+- [ ] Khóa XAI config/operator/schema và viết synthetic/unit proof.
+- [ ] Chạy BCI→Sleep seed-3407 attribution pilot và ba gate.
+- [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
+- [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
-### Follow-up execution queue — 2026-08-14
+### Completed execution history — 2026-08-14
 
-- `eeg-followup-gpu0`: đang chạy chín pairwise run còn thiếu, sau đó tự chạy chín BCI robustness runs trên physical GPU 0.
-- `eeg-joint-gpu2`: đang chạy joint upper bound ba seed trên physical GPU 2; đúng 2.500 update mỗi task theo round-robin, tổng 7.500 update mỗi seed.
-- `eeg-followup-summary`: tự chờ và tạo path-free, robustness và joint summaries với digest verification.
-- `eeg-intervention-gpu2`: tự chờ joint seed cuối, sau đó chạy ma trận 36 BCI→Sleep intervention trên physical GPU 2 và tự tổng hợp claim gate.
+- Pairwise, BCI robustness, joint upper bound, BCI→Sleep intervention, PhysioNet→BCI replication và directional v2 đều đã hoàn tất; tên tmux/log cũ bên dưới chỉ là audit trail, không phải active queue.
 - BCI robustness fold v2 giữ A03–A07 train, A08–A09 validation, A01–A02 test; không retune.
 - Intervention xếp hạng theo geometric mean của Fisher đã L2-normalize trong từng encoder layer. Mỗi tỷ lệ 1/5/10% dùng một high-overlap mask và ba random mask cùng số phần tử ở từng layer, chia sẻ mask qua ba training seed. Sau mỗi AdamW step, phần tử frozen được khôi phục chính xác về anchor để triệt cả decoupled weight decay.
 - Follow-up localization replication dùng hướng `physionet_mi → bciciv2a`, tỷ lệ 5/10%, ba matched random mask và ba seed (24 run). Hai tỷ lệ đều phải pass matched-plasticity/protection gate; không dùng lại mức 1% yếu trên validation của cặp đầu.
@@ -357,8 +341,18 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - Recovery 2026-08-14: intervention hoàn tất 24/24. Directional v1 dừng ở 14/18 do checksum của `physionet_to_bci/seed-2026` bị chép sai trong config (`892bcf...`). Giữ nguyên partial artifacts v1 làm audit trail; v2 chỉ sửa đúng digest nguồn, bind rõ v1 bị supersede và chạy lại đủ 18 result, không trộn hai config SHA trong summary.
 - Directional audit v2 hoàn tất 18/18 nhưng không giải thích forgetting tốt hơn overlap đối xứng (n=6, descriptive): correlation với mean `F_rel` lần lượt là overlap `-0,815`, gradient conflict `-0,646`, shared-Fisher drift `-0,715`, old-Fisher drift `-0,541`. Không mở thêm nhánh directional.
 - Final control chỉ thêm điều kiện `old_only`: freeze top Fisher của task cũ với đúng ngân sách từng layer như high-overlap. Chạy 2 cặp × 2 ratio × 3 seed = 12 run, tái dùng toàn bộ high-overlap result đã khóa. Sau control này dừng experiment branching và chuyển sang chốt analysis/paper, bất kể gate pass hay fail.
-- [ ] Hoàn thành Week 2 CL matrix.
-- [ ] Hoàn thành Week 3 diagnostic/intervention gate.
+
+### Active execution queue — 2026-08-15
+
+1. Sửa legacy reader và freeze official `old_only` summary; không chạy lại training.
+2. Tạo locked XAI pilot config cho direct BCI→Sleep seed 3407, bind exact source/post/joint checkpoint digests, frozen BCI validation `attribution_fit/gate` IDs và untouched test IDs.
+3. Implement rFFT cell occlusion, spectral-mask IG, subject-level BA drop, random-mask fidelity và bootstrap/split null với focused tests.
+4. Chạy pilot; ghi pass/fail từng gate trước khi tạo full-scale config.
+5. Chỉ khi pilot pass, generate immutable full matrix manifest từ checkpoint inventory hiện có và launch inference jobs.
+
+- [x] Hoàn thành Week 2 CL matrix.
+- [ ] Hoàn thành XAI attribution pilot gate.
+- [ ] Hoàn thành full explanation-drift scale gate.
 - [ ] Hoàn thành Week 4 analysis/full draft gate.
 - [ ] Hoàn thành submission package và validation.
 
@@ -405,26 +399,32 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-13: Prospective Fisher overlap không phải novelty độc lập vì Qian et al. đã có logic gần tương đương trong Whisper.
 - 2026-08-13: Can thiệp high-overlap vs matched random-freeze tại matched new-task performance là bằng chứng mạnh nhất.
 - 2026-08-13: Main paper giới hạn 2 figures + 1 table; channel–frequency chỉ là panel nhỏ để EEG grounding.
+- 2026-08-15: Kết quả Fisher chính bị khóa là negative audit: symmetric overlap không dự đoán positive forgetting risk, directional features không cải thiện, và old-task-only Fisher control làm shared-overlap benefit không còn nhất quán. Không mở thêm Fisher branch.
+- 2026-08-15: Headline chuyển sang channel–frequency explanation drift. Quyết định này supersede vai trò “panel nhỏ” ngày 2026-08-13; attribution lifetime giờ là RQ chính, còn Fisher chuyển ra secondary/repository.
+- 2026-08-15: Không reimplement EvoBrain, không dùng “engram”, không thêm TUEV/LaBraM/Grad-CAM. Tái dùng toàn bộ CL checkpoints đã khóa.
+- 2026-08-15: Pilot authority là direct BCI→Sleep seed 3407. Full scale bị chặn cho tới khi top-vs-random fidelity, spectral-mask IG rank agreement và observed-PED-vs-null gates đều pass.
+- 2026-08-15: Occlusion ranking fit và fidelity gate dùng hai nửa class-stratified, frozen trong validation subjects. Test subjects không được đọc trong pilot và chỉ dùng final reporting sau protocol lock. Primary drift là JSD của positive L1-normalized subject maps; cells/trials không phải inference units.
 
 ## Validation
 
 - Focused proof:
-  - Unit tests cho `R`, AA, BWT, AF, `F`, `F_rel`, near-chance handling và memory accounting.
-  - Dataset audit: unique subject across split; recording integrity; exact exclusion/event inventories; class/age/sex distribution.
-  - Shape/mask smoke tests cho 2/16/22-channel inputs và 30-second Sleep sequence.
-  - Deterministic same-task Fisher reproducibility check.
+  - Unit tests cho rFFT decomposition/reconstruction, exact one-cell removal, untouched-cell identity và finite output trên 2/22-channel, 4/30-patch signals.
+  - Subject-level BA-drop aggregation, positive-map normalization, JSD/rank-drift math, empty-positive-mass rejection và deterministic random masks.
+  - Spectral-mask IG completeness/finite check trên synthetic additive signal và exact cell registry alignment với occlusion.
+  - Config/checkpoint/cache/sample-ID digest tamper checks và immutable-output overwrite guard.
 - Integration proof:
-  - Một sequential FT run end-to-end qua mọi task trong benchmark đã khóa, gồm checkpoint, `R[i,j,s]`, overlap extraction và intervention mask.
-  - Recompute main table/figures từ frozen result artifacts bằng một command documented trong repository.
+  - Pilot BCI-only/post-Sleep/joint checkpoints strict-load, reproduce stored unoccluded BCI metrics và generate maps trên frozen validation `attribution_fit/gate` IDs mà không đọc test.
+  - Held-out top-20%-vs-100-random fidelity, IG rank agreement và same-checkpoint bootstrap/split null pass/fail được tạo bởi một digest-verified summary command.
+  - Recompute final PED table/figures từ immutable result artifacts bằng một documented command.
 - Statistical proof:
-  - Subject-clustered uncertainty, order/seed handling, leave-one-pair-out sensitivity và raw-`F` sensitivity.
-  - Matched-performance/Pareto comparison cho high-overlap versus random-freeze.
+  - Subject-clustered uncertainty, paired method/order/seed/transition comparison, raw-`F` sensitivity và BCI fold robustness.
+  - Không suy luận từ số trial/cell; report transition/seed coverage và distinguish exploratory association from attribution fidelity.
 - Repository-required checks:
   - Plan progress và decisions được cập nhật sau mỗi gate.
   - Không overwrite manifest/config/result đã dùng trong paper.
   - Final manuscript numbers trace được về immutable run IDs.
 
-Observed implementation proof on 2026-08-13:
+Existing foundation proof completed on 2026-08-13/14:
 
 - `python3.12 -m py_compile` passed for all source and test modules.
 - `UV_CACHE_DIR=/tmp/eeg-forgetting-uv-cache uv run pytest -q`: 79 tests passed, including manifest/config tamper checks, main/reproduction cache round-trip, CBraMod identity/variable-shape/depth/train-mode checks, exact per-example Fisher extraction/math, sequential forgetting/near-chance/replicate-summary rules, EWC penalty math, byte-capped reservoir accounting/state, method-selection constraints, stage-resume RNG restoration, fixed early-stopping contract, overwrite guards, and a real MNE RawArray filter/resample/channel-order integration test.
@@ -440,4 +440,4 @@ Observed implementation proof on 2026-08-13:
 
 ## Result
 
-Data-loader foundation, ba public raw-data snapshot, manifest/cache v3 including test, pretrained CBraMod adapter, fair linear probes, head/depth selection, exact-2.500-step/converged baselines, one-off PhysioNet reproduction, Fisher instrument gate, method-selection pilot và cả ba main CL matrices đã hoàn thành. Kết quả hiện tại cho thấy EWC/DER++ giảm mạnh forgetting, nhưng task-pair ranking không ủng hộ positive overlap-risk hypothesis. Bước kế tiếp là BCI robustness, joint upper bound và matched-plasticity intervention. TUEV vẫn cần xác nhận trước deadline truy cập.
+Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. EWC/DER++ giảm mạnh performance forgetting, nhưng chưa có phép đo nào trong repository trả lời liệu chúng có giữ channel–frequency reliance hay không; Integrated Gradients cũng chưa từng được chạy trong project này. Active next step là khóa XAI config/code và chạy đúng một BCI→Sleep seed-3407 pilot. Chưa được launch full XAI scale trước khi attribution gates pass.
