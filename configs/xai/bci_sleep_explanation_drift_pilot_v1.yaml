@@ -1,0 +1,97 @@
+schema_version: 1
+id: bci_sleep_explanation_drift_pilot_v1
+status: locked_xai_pilot
+task: bciciv2a
+transition: bciciv2a_to_sleep_edf_sc
+seed: 3407
+sampling_rate_hz: 200
+cache:
+  validation_index: data/processed/v3/bciciv2a/validation/index.json
+  validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+  validation_samples: 982
+  validation_subjects: [A06, A07]
+  test_index: data/processed/v3/bciciv2a/test/index.json
+  test_index_sha256: f6c7bcf2a7f9fb689bd506c25224887a64b5c6544b59d27bdcf1869d08973103
+  test_access_during_pilot: forbidden
+attribution_split:
+  method: sha256_rank_within_subject_class_v1
+  seed: 20260815
+  attribution_fit_samples: 489
+  attribution_gate_samples: 493
+  assignment_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+checkpoints:
+  before:
+    role: exact_budget_bci_only_source
+    path: results/continual/sequential_pairwise_clean_v1/bci_to_sleep/seed-3407/stage-01-bciciv2a/checkpoint.pt
+    sha256: afe91648d5edf3ff5fe1a76bfa8890c08b9597b4559659c432a04adef879f846
+    parent_config: configs/training/sequential_pairwise_clean_v1.yaml
+    parent_config_sha256: 667755d2c7eaf10f90ab68633e88927f661dd858804856db2b10d3a52d354f24
+    expected_stage: 1
+    expected_task: bciciv2a
+  after:
+    role: sequential_after_sleep
+    path: results/continual/sequential_pairwise_clean_v1/bci_to_sleep/seed-3407/stage-02-sleep_edf_sc/checkpoint.pt
+    sha256: 2a7142cb5cc1a099e4b7dd2d3bf7fd9e4d471ab54aa0aae36b723cf21618c38f
+    parent_config: configs/training/sequential_pairwise_clean_v1.yaml
+    parent_config_sha256: 667755d2c7eaf10f90ab68633e88927f661dd858804856db2b10d3a52d354f24
+    expected_stage: 2
+    expected_task: sleep_edf_sc
+  joint:
+    role: offline_joint_reference
+    path: results/joint/joint_v1/seed-3407/final.pt
+    sha256: 9432e35c0b901e79fe622a8ec19fa2272a32997331cc1edf67fa251e942b4f51
+    parent_config: configs/training/joint_v1.yaml
+    parent_config_sha256: 01f91068ef4c258c6d552796e2b54bd2b0657cbc9243b6b6ff540f32888bfa74
+    expected_seed: 3407
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  final_band_high_endpoint: closed
+  fft_scope: concatenate_all_one_second_patches_per_trial_before_rfft
+  occlusion_value: zero_selected_complex_rfft_coefficients
+evaluation:
+  batch_size: 16
+  mask_chunk_size: 4
+  aggregate_trials_within_subject_first: true
+fidelity:
+  ranking_split: attribution_fit
+  evaluation_split: attribution_gate
+  top_fraction: 0.20
+  random_masks: 100
+  random_seed: 20260816
+  threshold_percentile: 95
+integrated_gradients:
+  split: attribution_fit
+  baseline: all_zero_spectral_cell_mask
+  input: all_one_spectral_cell_mask
+  target: true_class_logit
+  steps: 32
+  alpha_rule: midpoint
+  alpha_chunk_size: 4
+  batch_size: 4
+  positive_attribution_only: true
+  rank_metric: spearman
+  minimum_rank_agreement: 0.30
+ped:
+  positive_part_then_l1_normalize: true
+  primary: base2_jensen_shannon_divergence
+  sensitivity: one_minus_spearman
+  subject_aggregation: equal_mean
+  null: repeated_subject_class_stratified_half_split_same_checkpoint
+  null_replicates: 200
+  null_seed: 20260817
+  null_threshold_percentile: 95
+gate:
+  required_checkpoint_roles: [before, after]
+  joint_is_reported_not_gate_required: true
+  require_all: [fidelity, integrated_gradients, drift_above_null]
+  maximum_technical_corrections_after_failure: 1
+output:
+  root: results/xai/bci_sleep_explanation_drift_pilot_v1
+  immutable: true
+purpose: gate_channel_frequency_explanation_drift_before_full_scale

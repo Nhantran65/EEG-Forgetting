@@ -104,6 +104,21 @@ def test_budget_single_task_checkpoint_roles_are_locked() -> None:
     )
 
 
+def test_explanation_drift_pilot_is_validation_only_and_digest_locked() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "bci_sleep_explanation_drift_pilot_v1.yaml"
+    )
+    assert config["status"] == "locked_xai_pilot"
+    assert config["cache"]["test_access_during_pilot"] == "forbidden"
+    assert config["attribution_split"]["assignment_sha256"] == (
+        "db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48"
+    )
+    assert set(config["checkpoints"]) == {"before", "after", "joint"}
+    assert config["fidelity"]["random_masks"] == 100
+    assert config["integrated_gradients"]["minimum_rank_agreement"] == 0.30
+    assert config["gate"]["required_checkpoint_roles"] == ["before", "after"]
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"

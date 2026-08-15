@@ -55,6 +55,28 @@ def _resolve(path: str) -> Path:
     return candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
 
 
+def _task_identity_matches(
+    result: dict[str, object], *, old_task: str, new_task: str
+) -> bool:
+    """Accept the legacy schema only when its independent task bindings agree."""
+    declared_old = result.get("old_task")
+    declared_new = result.get("new_task")
+    if declared_old is not None or declared_new is not None:
+        return declared_old == old_task and declared_new == new_task
+    expected = {old_task, new_task}
+    fisher_tasks = set(result.get("fisher_sha256", {}))
+    evaluations = result.get("evaluations", {})
+    if not isinstance(evaluations, dict):
+        return False
+    evaluation_tasks = {
+        task
+        for split in ("validation", "test")
+        if isinstance(evaluations.get(split), dict)
+        for task in evaluations[split]
+    }
+    return fisher_tasks == expected and evaluation_tasks == expected
+
+
 def _load_verified_result(
     path: Path,
     *,
@@ -72,8 +94,9 @@ def _load_verified_result(
         or int(result["seed"]) != seed
         or float(result["ratio"]) != ratio
         or result["condition"] != condition
-        or result["old_task"] != old_task
-        or result["new_task"] != new_task
+        or not _task_identity_matches(
+            result, old_task=old_task, new_task=new_task
+        )
     ):
         raise DatasetProtocolError(f"intervention result identity mismatch: {path}")
     checkpoint = path.parent / result["checkpoint"]["file"]

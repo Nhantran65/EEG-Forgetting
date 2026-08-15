@@ -322,9 +322,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy BCI→Sleep high-overlap intervention 1/5/10% với ba matched random masks × ba seed.
 - [x] Chạy PhysioNet→BCI localization replication 5/10% × bốn mask × ba seed.
 - [x] Chạy directional gradient/drift audit sáu transition × ba seed và tổng hợp descriptive correlation.
-- [x] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run); official summary còn cần legacy-schema compatibility fix.
+- [x] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run); legacy-schema reader đã sửa và official immutable summary xác nhận gate fail 3/4.
 - [x] Chốt pivot từ Fisher-overlap headline sang channel–frequency explanation drift.
-- [ ] Khóa XAI config/operator/schema và viết synthetic/unit proof.
+- [x] Khóa XAI config/operator/schema và viết synthetic/unit proof.
 - [ ] Chạy BCI→Sleep seed-3407 attribution pilot và ba gate.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
@@ -404,6 +404,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: Không reimplement EvoBrain, không dùng “engram”, không thêm TUEV/LaBraM/Grad-CAM. Tái dùng toàn bộ CL checkpoints đã khóa.
 - 2026-08-15: Pilot authority là direct BCI→Sleep seed 3407. Full scale bị chặn cho tới khi top-vs-random fidelity, spectral-mask IG rank agreement và observed-PED-vs-null gates đều pass.
 - 2026-08-15: Occlusion ranking fit và fidelity gate dùng hai nửa class-stratified, frozen trong validation subjects. Test subjects không được đọc trong pilot và chỉ dùng final reporting sau protocol lock. Primary drift là JSD của positive L1-normalized subject maps; cells/trials không phải inference units.
+- 2026-08-15: XAI pilot config bind exact BCI-only/post-Sleep/joint checkpoint SHA, validation/test-cache SHA và deterministic validation assignment SHA. Validation A06/A07 được khóa thành 489 `attribution_fit` + 493 `attribution_gate`; pilot có 22 channel × 5 band = 110 cell. Fidelity/IG bắt buộc pass ở before và after; joint được report nhưng không dùng để làm fail gate.
+- 2026-08-15: Legacy high-overlap artifacts thiếu `old_task/new_task` chỉ được reader chấp nhận khi config SHA, Fisher task keys và evaluation task keys cùng khớp. Official old-importance summary pass 3/4 final test controls, nên claim gate vẫn fail và kết luận negative audit không đổi.
 
 ## Validation
 
@@ -437,7 +439,8 @@ Existing foundation proof completed on 2026-08-13/14:
 - Frozen test caches were materialized and bound to manifest v3: BCI 1.036 samples/2 subjects, PhysioNet 1.530/17 and Sleep 37.227/15. Full source-checksum manifest audit passed immediately before launching sequential FT.
 - Sequential FT completed 9/9 immutable runs (three orders × three seeds). The predeclared stability gate passed with six signal-bearing and six sign-consistent directed transitions; the summary binds every input result by SHA-256.
 - EWC and DER++ each completed 9/9 immutable runs. Recomputed summaries verified every stage/checkpoint/prediction digest. Peak persistent state was 25,766,400 bytes for two offline-EWC Fisher/anchor states and 8,381,067 bytes for DER++'s 119-slot reservoir.
+- XAI implementation validation: locked-config dry run strict-loaded all three pilot checkpoints and verified 982 validation rows, frozen 489/493 split, 110-cell registry and all cache/checkpoint/config digests. Full repository suite passed `96 passed`; focused proof covers continuous-trial rFFT reconstruction, exact band removal, subject-equal reliance, base-2 JSD, spectral-mask IG completeness and legacy-summary compatibility.
 
 ## Result
 
-Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. EWC/DER++ giảm mạnh performance forgetting, nhưng chưa có phép đo nào trong repository trả lời liệu chúng có giữ channel–frequency reliance hay không; Integrated Gradients cũng chưa từng được chạy trong project này. Active next step là khóa XAI config/code và chạy đúng một BCI→Sleep seed-3407 pilot. Chưa được launch full XAI scale trước khi attribution gates pass.
+Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. XAI protocol/code/config đã khóa và pass dry-run/unit proof; Integrated Gradients vẫn chưa có empirical result cho tới khi pilot chạy xong. Active next step là launch đúng một BCI→Sleep seed-3407 pilot và đọc ba gate. Chưa được launch full XAI scale trước khi attribution gates pass.
