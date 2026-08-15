@@ -2,6 +2,7 @@
 
 from .explanation_drift import (
     apply_spectral_cell_weights,
+    frozen_stratified_capped_halves,
     frozen_stratified_halves,
     jensen_shannon_divergence,
     reliance_maps,
@@ -10,6 +11,7 @@ from .explanation_drift import (
 
 __all__ = [
     "apply_spectral_cell_weights",
+    "frozen_stratified_capped_halves",
     "frozen_stratified_halves",
     "jensen_shannon_divergence",
     "reliance_maps",

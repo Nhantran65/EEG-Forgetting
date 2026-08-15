@@ -22,6 +22,7 @@ from eeg_forgetting.training.metrics import subject_balanced_accuracy
 from eeg_forgetting.training.pilot import set_determinism
 from eeg_forgetting.xai.explanation_drift import (
     aggregate_positive_ig,
+    frozen_stratified_capped_halves,
     frozen_stratified_halves,
     integrated_gradients_dataset,
     mean_subject_jsd,
@@ -143,7 +144,12 @@ def _mask_digest(selected_cells: np.ndarray) -> str:
 
 
 def _random_cell_sets(
-    cells: int, selected: int, replicates: int, seed: int
+    cells: int,
+    selected: int,
+    replicates: int,
+    seed: int,
+    *,
+    excluded: tuple[int, ...] | None = None,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
     rows: list[np.ndarray] = []
@@ -151,7 +157,7 @@ def _random_cell_sets(
     while len(rows) < replicates:
         row = np.sort(rng.choice(cells, size=selected, replace=False))
         key = tuple(int(value) for value in row)
-        if key not in seen:
+        if key != excluded and key not in seen:
             seen.add(key)
             rows.append(row)
     return np.stack(rows)
@@ -215,7 +221,18 @@ def main() -> None:
     if sorted(set(subjects)) != sorted(str(value) for value in cache["validation_subjects"]):
         raise DatasetProtocolError("validation subject IDs changed")
     split_config = config["attribution_split"]
-    split = frozen_stratified_halves(labels, subjects, seed=int(split_config["seed"]))
+    split = (
+        frozen_stratified_capped_halves(
+            labels,
+            subjects,
+            seed=int(split_config["seed"]),
+            maximum_rows_per_subject_class=int(
+                split_config["maximum_rows_per_subject_class"]
+            ),
+        )
+        if "maximum_rows_per_subject_class" in split_config
+        else frozen_stratified_halves(labels, subjects, seed=int(split_config["seed"]))
+    )
     if (
         split["assignment_sha256"] != split_config["assignment_sha256"]
         or len(split["attribution_fit"]) != int(split_config["attribution_fit_samples"])
@@ -317,6 +334,11 @@ def main() -> None:
             selected_count,
             int(fidelity_config["random_masks"]),
             int(fidelity_config["random_seed"]),
+            excluded=(
+                tuple(int(value) for value in top_cells)
+                if fidelity_config.get("exclude_top_mask_from_random", False)
+                else None
+            ),
         )
         selected_sets = np.concatenate((top_cells[None, :], random_cells), axis=0)
         fidelity_masks = torch.ones(len(selected_sets), len(channels), len(bands))

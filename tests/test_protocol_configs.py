@@ -150,6 +150,30 @@ def test_bci_sleep_method_scale_is_checkpoint_only_and_test_blind() -> None:
     )
 
 
+def test_physionet_and_sleep_attribution_sets_are_capped_and_test_blind() -> None:
+    expected = {
+        "physionet_sleep_explanation_replication_v1.yaml": (
+            720,
+            720,
+            "419fafc23fec9f304086594531b868a9d2dba40f7c52fa186eb01aab39c81974",
+        ),
+        "sleep_physionet_explanation_replication_v1.yaml": (
+            732,
+            732,
+            "e6be61c974a4d96b31514a583622cbb9a488b2c341c4f01e02c5fcdd6295e0de",
+        ),
+    }
+    for filename, (fit, gate, digest) in expected.items():
+        config = load_yaml(ROOT / "configs" / "xai" / filename)
+        split = config["attribution_split"]
+        assert config["status"] == "locked_xai_replication"
+        assert config["cache"]["test_access_during_pilot"] == "forbidden"
+        assert split["maximum_rows_per_subject_class"] == 20
+        assert split["attribution_fit_samples"] == fit
+        assert split["attribution_gate_samples"] == gate
+        assert split["assignment_sha256"] == digest
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"

@@ -6,6 +6,7 @@ from torch import nn
 from eeg_forgetting.data.contracts import DatasetProtocolError
 from eeg_forgetting.xai.explanation_drift import (
     apply_spectral_cell_weights,
+    frozen_stratified_capped_halves,
     frozen_stratified_halves,
     jensen_shannon_divergence,
     reliance_maps,
@@ -28,6 +29,18 @@ def test_frozen_halves_are_deterministic_stratified_and_digest_bound() -> None:
         assert {(subjects[row], labels[row]) for row in rows} == {
             ("A", 0), ("A", 1), ("B", 0), ("B", 1)
         }
+
+
+def test_capped_halves_limit_each_subject_class_before_splitting() -> None:
+    labels = [0] * 7 + [1] * 7
+    subjects = ["A"] * 14
+    split = frozen_stratified_capped_halves(
+        labels, subjects, seed=19, maximum_rows_per_subject_class=4
+    )
+    assert len(split["attribution_fit"]) == 4
+    assert len(split["attribution_gate"]) == 4
+    assert split["strata"]["A:0"]["available"] == 7
+    assert split["strata"]["A:0"]["selected"] == 4
 
 
 def test_all_one_spectral_weights_reconstruct_and_one_cell_removes_band() -> None:

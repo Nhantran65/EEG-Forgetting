@@ -60,6 +60,58 @@ def frozen_stratified_halves(
     return document
 
 
+def frozen_stratified_capped_halves(
+    labels: Sequence[int],
+    subjects: Sequence[str],
+    *,
+    seed: int,
+    maximum_rows_per_subject_class: int,
+) -> dict[str, object]:
+    """Freeze at most N hash-ranked rows per subject/class, then split in half."""
+    if maximum_rows_per_subject_class < 2:
+        raise DatasetProtocolError("capped attribution strata need at least two rows")
+    if len(labels) != len(subjects) or not labels:
+        raise DatasetProtocolError("attribution split needs aligned non-empty rows")
+    strata: dict[tuple[str, int], list[int]] = defaultdict(list)
+    for index, (label, subject) in enumerate(zip(labels, subjects, strict=True)):
+        strata[(str(subject), int(label))].append(index)
+    fit: list[int] = []
+    gate: list[int] = []
+    counts: dict[str, dict[str, int]] = {}
+    for (subject, label), rows in sorted(strata.items()):
+        if len(rows) < 2:
+            raise DatasetProtocolError(
+                f"subject/class stratum {subject}/{label} has fewer than two rows"
+            )
+        ranked = sorted(
+            rows,
+            key=lambda row: hashlib.sha256(
+                f"{seed}|{subject}|{label}|{row}".encode()
+            ).hexdigest(),
+        )
+        selected = ranked[:maximum_rows_per_subject_class]
+        midpoint = len(selected) // 2
+        fit.extend(selected[:midpoint])
+        gate.extend(selected[midpoint:])
+        counts[f"{subject}:{label}"] = {
+            "available": len(ranked),
+            "selected": len(selected),
+            "attribution_fit": midpoint,
+            "attribution_gate": len(selected) - midpoint,
+        }
+    document: dict[str, object] = {
+        "method": "sha256_rank_capped_within_subject_class_v1",
+        "seed": int(seed),
+        "maximum_rows_per_subject_class": int(maximum_rows_per_subject_class),
+        "attribution_fit": sorted(fit),
+        "attribution_gate": sorted(gate),
+        "strata": counts,
+    }
+    canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    document["assignment_sha256"] = hashlib.sha256(canonical).hexdigest()
+    return document
+
+
 def _band_masks(
     samples: int, sampling_rate_hz: float, bands: Sequence[Band], *, device: torch.device
 ) -> Tensor:
