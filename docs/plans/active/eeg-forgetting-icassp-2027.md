@@ -325,7 +325,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy final old-task-importance control trên BCI→Sleep và PhysioNet→BCI, 5/10% × ba seed (12 run); legacy-schema reader đã sửa và official immutable summary xác nhận gate fail 3/4.
 - [x] Chốt pivot từ Fisher-overlap headline sang channel–frequency explanation drift.
 - [x] Khóa XAI config/operator/schema và viết synthetic/unit proof.
-- [ ] Chạy BCI→Sleep seed-3407 attribution pilot và ba gate.
+- [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
@@ -408,7 +408,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: Legacy high-overlap artifacts thiếu `old_task/new_task` chỉ được reader chấp nhận khi config SHA, Fisher task keys và evaluation task keys cùng khớp. Official old-importance summary pass 3/4 final test controls, nên claim gate vẫn fail và kết luận negative audit không đổi.
 - 2026-08-15: Pilot launch đầu tiên hoàn tất immutable `before` cell predictions rồi dừng ở fidelity vì NumPy array không có scalar truth value trong empty-index guard. Technical correction duy nhất đổi `not indices` thành `len(indices) == 0`, thêm regression test và không thay đổi config, operator, split, threshold hay artifact đã tính.
 - 2026-08-15: Seed-3407 pilot hoàn tất: fidelity pass mạnh ở before/after, PED `0,4286` vượt conservative same-checkpoint null p95 `0,4207`, nhưng hard IG gate cũ fail sát vì after `rho=0,2985 < 0,30` (before `0,3092`, joint `0,5035`). Original result giữ nguyên borderline fail; không round hoặc overwrite.
-- 2026-08-15: Trước khi mở seed bổ sung, protocol amendment v2 xác nhận `0,30` là internal heuristic chứ không phải external validity standard. IG chuyển thành continuous supporting evidence; fidelity và PED-vs-null là hard gates. Chạy frozen replication seed 42/2026 và chỉ scale nếu ít nhất 2/3 seed pass cả hard gates, đồng thời IG dương ở before/after cho cả ba seed. Không thay attribution operator, sample split, mask, null hoặc checkpoint.
+- 2026-08-15: Trước khi mở seed bổ sung, protocol amendment v2 xác nhận `0,30` là internal heuristic chứ không phải external validity standard. IG chuyển thành continuous supporting evidence; fidelity và PED-vs-null là hard gates. Chạy frozen replication seed 42/2026 và chỉ scale nếu mỗi hard gate pass ít nhất 2/3 seed, đồng thời IG dương ở before/after cho cả ba seed. Không thay attribution operator, sample split, mask, null hoặc checkpoint.
+- 2026-08-15: Replication seed 42/2026 hoàn tất. Theo rule per-gate đã nói trước khi chạy: fidelity pass 2/3 seed, PED-vs-null pass 2/3 seed và required-role IG dương 3/3 seed; scale được phép nhưng phải báo instability vì chỉ seed 3407 pass đồng thời cả hai hard gate. Joint IG không phải required-role evidence.
+- 2026-08-15: RQ2 scale bắt đầu bằng BCI←Sleep trên main CL matrix: Sequential/EWC/DER++ × order forward/challenging × seed 3407/42/2026 = 18 paired transition cells. Mỗi cell dùng stage-2 before và stage-3 after checkpoint đã được main summary digest-bind, cùng frozen BCI validation split và occlusion/fidelity/PED-null operator; không train lại và không đọc test. IG không lặp trên mọi checkpoint vì đã là supporting instrument kiểm qua ba pilot seed.
 
 ## Validation
 
@@ -443,7 +445,8 @@ Existing foundation proof completed on 2026-08-13/14:
 - Sequential FT completed 9/9 immutable runs (three orders × three seeds). The predeclared stability gate passed with six signal-bearing and six sign-consistent directed transitions; the summary binds every input result by SHA-256.
 - EWC and DER++ each completed 9/9 immutable runs. Recomputed summaries verified every stage/checkpoint/prediction digest. Peak persistent state was 25,766,400 bytes for two offline-EWC Fisher/anchor states and 8,381,067 bytes for DER++'s 119-slot reservoir.
 - XAI implementation validation: locked-config dry run strict-loaded all three pilot checkpoints and verified 982 validation rows, frozen 489/493 split, 110-cell registry and all cache/checkpoint/config digests. Full repository suite passed `97 passed`; focused proof covers continuous-trial rFFT reconstruction, exact band removal, NumPy frozen-index handling, subject-equal reliance, base-2 JSD, spectral-mask IG completeness and legacy-summary compatibility.
+- RQ2 BCI←Sleep scale preflight strict-loaded before/after checkpoints từ Sequential-forward-3407, EWC-challenging-42 và DER++-forward-2026, đồng thời verified parent config/summary/result/stage/checkpoint/cache/split digests. Full repository suite passed `99 passed` trước launch.
 
 ## Result
 
-Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. XAI protocol/code/config đã khóa và pass dry-run/unit proof; Integrated Gradients vẫn chưa có empirical result cho tới khi pilot chạy xong. Active next step là launch đúng một BCI→Sleep seed-3407 pilot và đọc ba gate. Chưa được launch full XAI scale trước khi attribution gates pass.
+Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. Ba-seed BCI→Sleep attribution pilot cho phép scale theo transparent amended per-gate rule nhưng cho thấy seed instability phải giữ trong claim. Active work là 18-cell BCI←Sleep Sequential/EWC/DER++ comparison; sau đó mới quyết định mở các directed transition còn lại.

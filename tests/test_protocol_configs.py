@@ -136,6 +136,20 @@ def test_explanation_drift_replication_amendment_is_locked_before_results() -> N
     assert "minimum_rank_agreement" not in config["integrated_gradients"]
 
 
+def test_bci_sleep_method_scale_is_checkpoint_only_and_test_blind() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "bci_sleep_method_scale_v1.yaml"
+    )
+    assert config["status"] == "locked_xai_scale"
+    assert set(config["methods"]) == {"sequential", "ewc", "derpp"}
+    assert set(config["orders"]) == {"forward", "challenging"}
+    assert config["seeds"] == [3407, 42, 2026]
+    assert config["cache"]["test_access_during_scale"] == "forbidden"
+    assert config["integrated_gradients"]["scale_policy"] == (
+        "not_repeated_per_checkpoint"
+    )
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"

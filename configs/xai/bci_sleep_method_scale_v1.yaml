@@ -1,0 +1,93 @@
+schema_version: 1
+id: bci_sleep_method_scale_v1
+status: locked_xai_scale
+scope: rq2_bci_reliance_before_after_learning_sleep
+scale_authority:
+  pilot_result: results/xai/bci_sleep_explanation_drift_pilot_v1/result.json
+  pilot_result_sha256: 4d0f8ec3ab5516811c07d66bfc7dfe57435370ace0348fff6d156569dae663f1
+  replication_config: configs/xai/bci_sleep_explanation_drift_replication_v2.yaml
+  replication_config_sha256: 6aaec0db72975f954a55b3b6cbd8ff3d2639c0d5e643224df948820f0f84d6ab
+  decision: per_gate_two_of_three_seeds_pass_and_required_role_ig_positive_three_of_three
+task: bciciv2a
+learned_task: sleep_edf_sc
+seeds: [3407, 42, 2026]
+orders:
+  forward:
+    full_order: [bciciv2a, physionet_mi, sleep_edf_sc]
+    before_stage: 2
+    before_learned_task: physionet_mi
+    after_stage: 3
+    after_learned_task: sleep_edf_sc
+  challenging:
+    full_order: [physionet_mi, bciciv2a, sleep_edf_sc]
+    before_stage: 2
+    before_learned_task: bciciv2a
+    after_stage: 3
+    after_learned_task: sleep_edf_sc
+methods:
+  sequential:
+    run_id: sequential_ft_v1
+    result_root: results/continual/sequential_ft_v1
+    config: configs/training/sequential_ft_v1.yaml
+    config_sha256: 6d0b202f5a734a91a56c317584f9943a244c708ddc10f60ccec2ef12e042f3a7
+    summary: results/continual/sequential_ft_v1/summary.json
+    summary_sha256: 6412185fec1b020a2ba7df4e7e8eb67efc168783cb5910e18010c6497bd05493
+  ewc:
+    run_id: ewc_v1
+    result_root: results/continual/ewc_v1
+    config: configs/training/ewc_v1.yaml
+    config_sha256: c7f7b8447ac13bbfe1218c9aa91f26b842af3f077a6aaf8214ec92d2a3379740
+    summary: results/continual/ewc_v1/summary.json
+    summary_sha256: 592477b6f763eeb1676405815fec90c813393dfc75acab384357fdbdc6326e51
+  derpp:
+    run_id: derpp_v1
+    result_root: results/continual/derpp_v1
+    config: configs/training/derpp_v1.yaml
+    config_sha256: 56fc8b30ed4a02d1c5c7cf1b3726efcae6f5b65345914531518c693d355f5de8
+    summary: results/continual/derpp_v1/summary.json
+    summary_sha256: e7f1e875f7b5f0aa28460b5145e4ff112d79fc3df41e296aff0e0edbc2b5a801
+cache:
+  validation_index: data/processed/v3/bciciv2a/validation/index.json
+  validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+  validation_samples: 982
+  validation_subjects: [A06, A07]
+  test_index: data/processed/v3/bciciv2a/test/index.json
+  test_index_sha256: f6c7bcf2a7f9fb689bd506c25224887a64b5c6544b59d27bdcf1869d08973103
+  test_access_during_scale: forbidden
+attribution_split:
+  method: sha256_rank_within_subject_class_v1
+  seed: 20260815
+  attribution_fit_samples: 489
+  attribution_gate_samples: 493
+  assignment_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+  fft_scope: concatenate_all_one_second_patches_per_trial_before_rfft
+evaluation:
+  batch_size: 16
+  mask_chunk_size: 4
+fidelity:
+  top_fraction: 0.20
+  random_masks: 100
+  random_seed: 20260816
+  threshold_percentile: 95
+ped:
+  primary: base2_jensen_shannon_divergence
+  subject_aggregation: equal_mean
+  null_replicates: 200
+  null_seed: 20260817
+  null_threshold_percentile: 95
+integrated_gradients:
+  scale_policy: not_repeated_per_checkpoint
+  justification: positive_supporting_agreement_was_checked_across_three_frozen_pilot_seeds
+output:
+  root: results/xai/bci_sleep_method_scale_v1
+  immutable: true
+purpose: compare_performance_retention_and_explanation_retention_across_cl_methods
