@@ -43,6 +43,7 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "configs" / "xai" / "bci_sleep_explanation_drift_pilot_v1.yaml",
     )
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--seed", type=int)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--validate-only", action="store_true")
     return parser.parse_args()
@@ -166,16 +167,37 @@ def _rank_sensitivity(left: np.ndarray, right: np.ndarray) -> float:
 def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
-    if config.get("status") != "locked_xai_pilot":
-        raise DatasetProtocolError("XAI pilot config is not locked")
+    if config.get("status") not in {"locked_xai_pilot", "locked_xai_replication"}:
+        raise DatasetProtocolError("XAI config is not locked")
     if config["cache"].get("test_access_during_pilot") != "forbidden":
         raise DatasetProtocolError("pilot must forbid test access")
     config_sha = sha256_file(args.config)
+    if "checkpoints_by_seed" in config:
+        if args.seed is None or int(args.seed) not in tuple(
+            int(value) for value in config["seeds"]
+        ):
+            raise DatasetProtocolError("replication seed is missing or not locked")
+        run_seed = int(args.seed)
+        checkpoint_specs = config["checkpoints_by_seed"].get(run_seed)
+        if checkpoint_specs is None:
+            checkpoint_specs = config["checkpoints_by_seed"].get(str(run_seed))
+        if checkpoint_specs is None:
+            raise DatasetProtocolError("replication checkpoint seed is not declared")
+    else:
+        run_seed = int(config["seed"])
+        if args.seed is not None and int(args.seed) != run_seed:
+            raise DatasetProtocolError("pilot seed override is forbidden")
+        checkpoint_specs = config["checkpoints"]
     device = torch.device(args.device)
     if device.type == "cuda":
         torch.cuda.set_device(device)
-    set_determinism(int(config["seed"]))
-    output = args.output_root or _resolve(str(config["output"]["root"]))
+    set_determinism(run_seed)
+    configured_output = _resolve(str(config["output"]["root"]))
+    output = args.output_root or (
+        configured_output / f"seed-{run_seed}"
+        if "checkpoints_by_seed" in config
+        else configured_output
+    )
     result_path = output / "result.json"
     if result_path.exists():
         raise DatasetProtocolError(f"refusing to overwrite XAI result {result_path}")
@@ -222,7 +244,7 @@ def main() -> None:
         individual_masks[cell + 1].view(-1)[cell] = 0.0
 
     if args.validate_only:
-        for role, checkpoint_spec in config["checkpoints"].items():
+        for role, checkpoint_spec in checkpoint_specs.items():
             model = _load_model(role, checkpoint_spec, device)
             del model
         print(
@@ -236,7 +258,7 @@ def main() -> None:
                     "cells": cell_count,
                     "checkpoints": {
                         role: value["sha256"]
-                        for role, value in config["checkpoints"].items()
+                        for role, value in checkpoint_specs.items()
                     },
                 },
                 indent=2,
@@ -250,7 +272,7 @@ def main() -> None:
     ig_config = config["integrated_gradients"]
     role_arrays: dict[str, dict[str, np.ndarray]] = {}
     role_results: dict[str, object] = {}
-    for role, checkpoint_spec in config["checkpoints"].items():
+    for role, checkpoint_spec in checkpoint_specs.items():
         checkpoint_sha = str(checkpoint_spec["sha256"])
         metadata = _artifact_metadata(config_sha, role, checkpoint_sha)
         model = _load_model(role, checkpoint_spec, device)
@@ -471,19 +493,42 @@ def main() -> None:
     conservative_null = max(null_thresholds.values())
     required_roles = tuple(str(value) for value in config["gate"]["required_checkpoint_roles"])
     fidelity_pass = all(role_results[role]["fidelity"]["passed"] for role in required_roles)
-    ig_pass = all(
-        role_results[role]["integrated_gradients"]["rank_agreement_spearman"]
-        >= float(ig_config["minimum_rank_agreement"])
+    ig_threshold = ig_config.get("minimum_rank_agreement")
+    ig_pass = (
+        all(
+            role_results[role]["integrated_gradients"]["rank_agreement_spearman"]
+            >= float(ig_threshold)
+            for role in required_roles
+        )
+        if ig_threshold is not None
+        else None
+    )
+    ig_all_positive = all(
+        role_results[role]["integrated_gradients"]["rank_agreement_spearman"] > 0
         for role in required_roles
     )
     drift_pass = observed_ped > conservative_null
+    gate_config = config["gate"]
+    hard_require_values = (
+        gate_config["hard_require"]
+        if "hard_require" in gate_config
+        else gate_config["require_all"]
+    )
+    hard_require = tuple(str(value) for value in hard_require_values)
+    hard_gate_values = {
+        "fidelity": fidelity_pass,
+        "integrated_gradients": bool(ig_pass),
+        "drift_above_null": drift_pass,
+    }
+    if not set(hard_require).issubset(hard_gate_values):
+        raise DatasetProtocolError("unknown hard XAI gate")
     result = {
         "schema_version": 1,
         "run": config["id"],
         "config_sha256": config_sha,
         "task": config["task"],
         "transition": config["transition"],
-        "seed": int(config["seed"]),
+        "seed": run_seed,
         "cache": {
             "validation_index_sha256": sha256_file(validation_index),
             "untouched_test_index_sha256": sha256_file(test_index),
@@ -512,8 +557,10 @@ def main() -> None:
             "required_checkpoint_roles": list(required_roles),
             "fidelity_passed": fidelity_pass,
             "integrated_gradients_passed": ig_pass,
+            "integrated_gradients_all_positive": ig_all_positive,
+            "hard_require": list(hard_require),
             "drift_above_null_passed": drift_pass,
-            "all_passed": bool(fidelity_pass and ig_pass and drift_pass),
+            "all_passed": all(hard_gate_values[name] for name in hard_require),
         },
         "device": str(device),
         "torch": torch.__version__,

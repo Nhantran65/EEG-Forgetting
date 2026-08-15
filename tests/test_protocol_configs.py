@@ -119,6 +119,23 @@ def test_explanation_drift_pilot_is_validation_only_and_digest_locked() -> None:
     assert config["gate"]["required_checkpoint_roles"] == ["before", "after"]
 
 
+def test_explanation_drift_replication_amendment_is_locked_before_results() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "bci_sleep_explanation_drift_replication_v2.yaml"
+    )
+    assert config["status"] == "locked_xai_replication"
+    assert config["seeds"] == [42, 2026]
+    assert set(config["checkpoints_by_seed"]) == {42, 2026}
+    assert config["gate"]["hard_require"] == ["fidelity", "drift_above_null"]
+    assert config["gate"]["cross_seed_decision"] == {
+        "seeds_including_original": [3407, 42, 2026],
+        "minimum_hard_gate_passes": 2,
+        "require_ig_positive_for_all_seeds": True,
+        "no_posthoc_ig_threshold": True,
+    }
+    assert "minimum_rank_agreement" not in config["integrated_gradients"]
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"
