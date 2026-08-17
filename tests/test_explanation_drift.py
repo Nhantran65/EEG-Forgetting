@@ -13,6 +13,7 @@ from eeg_forgetting.xai.explanation_drift import (
     ridge_mask_coefficients,
     score_spectral_masks,
     spectral_mask_integrated_gradients,
+    subject_class_balanced_margin_drop,
     subject_equal_margin_drop,
 )
 
@@ -174,3 +175,13 @@ def test_ridge_mask_coefficients_recover_synthetic_additive_effects() -> None:
     observed, intercept = ridge_mask_coefficients(indicators, responses, alpha=1e-8)
     assert observed == pytest.approx(expected, abs=1e-7)
     assert intercept == pytest.approx(0.3, abs=1e-7)
+
+
+def test_class_balanced_margin_drop_does_not_weight_common_class_more() -> None:
+    baseline = np.zeros(4)
+    masked = np.array([[-1.0, -1.0, -1.0, -3.0]])
+    aggregate, by_subject = subject_class_balanced_margin_drop(
+        baseline, masked, [0, 0, 0, 1], ["A", "A", "A", "A"]
+    )
+    assert aggregate[0] == pytest.approx(2.0)
+    assert by_subject["A"][0] == pytest.approx(2.0)

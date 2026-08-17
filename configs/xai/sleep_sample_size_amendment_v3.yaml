@@ -1,0 +1,76 @@
+schema_version: 3
+id: sleep_sample_size_amendment_v3
+status: locked_xai_reliability_pilot
+task: sleep_edf_sc
+seed: 42
+checkpoint:
+  role: sleep_before_physionet
+  path: results/continual/sequential_ft_v1/reverse/seed-42/stage-01-sleep_edf_sc/checkpoint.pt
+  sha256: 397d6d60437a55cf5745635c37e276ef99daca8c0dceebb198f0aab54eed7924
+  parent_config: configs/training/sequential_ft_v1.yaml
+  parent_config_sha256: 6d0b202f5a734a91a56c317584f9943a244c708ddc10f60ccec2ef12e042f3a7
+  expected_stage: 1
+  expected_task: sleep_edf_sc
+cache:
+  validation_index: data/processed/v3/sleep_edf_sc/validation/index.json
+  validation_index_sha256: f713d1a5375b627c1d9906f02d0a351118b522b476debd2bd027507a64c7480d
+  validation_samples: 39580
+  validation_subjects: [SC02, SC09, SC16, SC18, SC20, SC21, SC34, SC38, SC43, SC46, SC54, SC59, SC61, SC65, SC70]
+  test_index: data/processed/v3/sleep_edf_sc/test/index.json
+  test_index_sha256: 744ed9f7630448462e64538cae958d38cb0766f5db2793e1fe4cfbfb7426917c
+  test_access: forbidden
+sample_size_curve:
+  split_seed: 20260821
+  caps:
+    20: {fit: 732, gate: 732, assignment_sha256: 1f1d5eb31cd36da9c9ab24fd410582bff0b5f5b33bb1931d6a6ce370cb454970}
+    50: {fit: 1816, gate: 1816, assignment_sha256: 13e02cbfebd29dd020d77c87c5afe8af1f8ff34595a65c72912f93ce6a6b164d}
+    100: {fit: 3561, gate: 3564, assignment_sha256: 7cea245dedc6c939d7a57d8072f1ca8168405ebe849edf4945a3c8a85af91a0a}
+    200: {fit: 6777, gate: 6782, assignment_sha256: fcc6453443a08cdf0676b5408257618ce770d00b3071e397d1ef92a2dca87cc1}
+  score_only_union_of_cap_200: true
+  aggregation: mean_within_class_then_equal_mean_classes_then_equal_mean_subjects
+cell_registry:
+  channels: [FPZ-CZ, PZ-OZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+reliability_gate:
+  cap: 200
+  all_subject_cosines_finite: true
+  minimum_median_subject_cosine: 0.70
+  subject_threshold: 0.50
+  minimum_subject_fraction_at_threshold: 0.6666666666666666
+sleep_fidelity:
+  selected_cells: 3
+  enumerate_all_combinations: true
+  combinations: 120
+  percentile: 95
+  require_margin_and_ba: true
+bci_fidelity:
+  result: results/xai/bci_margin_mask_reliability_v2/result.json
+  result_sha256: 946a7044f653687128cafb1b9bf6eadd88598dad39dffd3b007d0a11130d17bc
+  score_artifact: results/xai/bci_margin_mask_reliability_v2/margin-scores.npz
+  score_artifact_sha256: 171a0ac139579f84daa262c46506f3501586dad4a133777f8a74da30a0fb35dc
+  checkpoint_path: results/continual/sequential_pairwise_clean_v1/bci_to_sleep/seed-42/stage-01-bciciv2a/checkpoint.pt
+  checkpoint_sha256: 8ec20a59c56c4ad71c36355ce1897a6c3f5118233cd580bd2d813f843d01d81e
+  parent_config_sha256: 667755d2c7eaf10f90ab68633e88927f661dd858804856db2b10d3a52d354f24
+  expected_stage: 1
+  expected_task: bciciv2a
+  validation_index: data/processed/v3/bciciv2a/validation/index.json
+  validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+  attribution_gate_indices_from_result: true
+  split_seed: 20260815
+  split_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+  selected_cells: 22
+  random_masks_from_score_artifact: 200
+  percentile: 95
+  require_margin_and_ba: true
+evaluation: {batch_size: 8, mask_chunk_size: 4}
+decision:
+  pass: reliability_and_both_fidelity_legs_pass
+  fail: stop_xai
+output: {root: results/xai/sleep_sample_size_amendment_v3, immutable: true}
+purpose: final_bounded_go_no_go_for_reliability_aware_xai

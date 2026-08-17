@@ -1,7 +1,7 @@
 # Execution Plan: Channel–Frequency Explanation Drift in Continual EEG Foundation Models
 
 Date: 2026-08-13
-Last updated: 2026-08-15
+Last updated: 2026-08-17
 
 ## Status
 
@@ -231,6 +231,56 @@ tiếp dùng đúng một PhysioNet-Before-Sleep seed-42 checkpoint: mọi subje
 phải finite, median `>=0,70`, và ít nhất 2/3 subject `>=0,50`. Không PED/IG/full
 scale trước gate này.
 
+### Sleep sample-size amendment v3 — 2026-08-17
+
+PhysioNet gate fail có thể do số trial mỗi subject, không do estimator. Bằng chứng:
+cắt BCI margin-drop xuống đúng ngân sách PhysioNet (44 row/subject/nửa) cho cosine
+`0,722/0,541`, cũng dưới gate. Sleep-EDF có median `2.386` epoch/subject nên là task
+duy nhất mà ràng buộc này không bị dữ liệu chặn; cap 20 hiện tại tự giới hạn xuống
+48 row/subject/nửa, gần y hệt PhysioNet. Chạy đúng một pilot để phân biệt hai
+nguyên nhân, rồi mới quyết định đóng XAI vĩnh viễn.
+
+Đối tượng: Sleep-Before-PhysioNet, sequential reverse stage 1, seed 42.
+
+- checkpoint `results/continual/sequential_ft_v1/reverse/seed-42/stage-01-sleep_edf_sc/checkpoint.pt`
+- sha256 `397d6d60437a55cf5745635c37e276ef99daca8c0dceebb198f0aab54eed7924`
+- estimator: single-cell margin-drop; ridge branch vẫn đóng vĩnh viễn
+- cell registry: `FPZ-CZ, PZ-OZ` × 5 band = 10 cell
+- split: `frozen_stratified_capped_halves`, seed `20260821`, `maximum_rows_per_subject_class: 200`
+
+Chạy **một** lần forward duy nhất ở cap 200, không tạo hai config. Các tập được
+chọn là lồng nhau vì sha256 rank được tính trước khi cắt theo cap (verified:
+cap 20 ⊂ cap 50 ⊂ cap 200), nên reliability ở mọi mức nhỏ hơn được tính offline từ
+cùng margin artifact: 0 GPU thêm, và các điểm là paired thay vì hai run rời.
+
+Curve bắt buộc báo, đơn vị row/subject/nửa: `48` (= cap 20 hiện tại), `121`, `237`, `451`.
+
+Cấm cap 400: class composition lệch rõ (lớp 2 lên 27%, lớp 3 xuống 11%, so với
+20%/18% ở cap 20) nên reliability tăng sẽ lẫn confound thành phần lớp. Ở cap 200 chỉ
+lớp 3 tụt `18% -> 14%`, phần còn lại gần như không đổi.
+
+Chi phí: `13.559` row × 11 mask ≈ 149k forward pass, khoảng một nửa pilot BCI v2.
+
+Gate giữ nguyên như PhysioNet để hai task so sánh được: unit là subject, mọi cosine
+phải finite, median `>=0,70`, và ít nhất 2/3 subject `>=0,50`. Group cosine chỉ là
+secondary và không override subject gate. Để cap lớn không bị confound bởi lớp
+hiếm cạn trước, margin-drop được mean trong từng class trước rồi equal-average
+giữa các class hiện diện của subject; không pool row theo class frequency.
+
+Ba outcome khai báo trước khi chạy, cả ba đều kết luận được:
+
+1. Reliability tăng theo `n` và vượt gate: sample size là nguyên nhân, Sleep đo được, mở PED v2 cho Sleep.
+2. Phẳng và thấp ở mọi `n`: sample size không phải nguyên nhân, đóng XAI, negative result mạnh hơn vì loại được giả thuyết thiếu dữ liệu.
+3. Tăng nhưng plateau dưới gate: Sleep fail kèm trần định lượng, đóng XAI.
+
+Fidelity leg chạy cùng lượt này ở hai chỗ, vì hiện chỉ có reliability mà chưa có
+faithfulness cho margin-drop:
+
+- Sleep: 10 cell nên `top_fraction: 0,20` chỉ chọn 2 cell và chỉ tồn tại `C(10,2)=45` tập (log cũ xác nhận code tự cắt xuống 44 control, percentile 95 quá thô). Dùng top `3/10` và **liệt kê đủ** `C(10,3)=120` tập thay vì 100 draw ngẫu nhiên.
+- BCI: fidelity của margin-drop còn nợ từ reliability pilot v2; chạy trên đúng BCI-Before seed-42 checkpoint đã khóa.
+
+Không đọc test. Không train lại. Không mở PED/IG/full method scale trước khi gate này pass.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -358,6 +408,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
 - [x] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42; gate fail và XAI scale dừng.
+- [ ] Chạy Sleep sample-size amendment v3: một forward ở cap 200 trên Sleep-Before-PhysioNet seed 42, báo curve `48/121/237/451` row/subject/nửa từ cùng artifact.
+- [ ] Chạy fidelity leg cho margin-drop: Sleep top `3/10` exhaustive `C(10,3)=120`, và BCI-Before seed 42 còn nợ.
+- [ ] Quyết định đóng hay mở lại XAI theo ba outcome đã khai báo trong amendment v3.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -449,6 +502,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-17: Reliability v2 pilot xác nhận core idea nhưng bác bỏ additive surrogate: exact seed-42 v1 BA-drop cosine `0,3498`; single-cell margin-drop tăng lên `0,7668`; randomized-mask ridge coefficient cosine `0,9068` và per-subject `0,9214/0,9266`, nhưng held-out mask `R²=-1,4976/-0,9388`. Vì ridge không predict được unseen mask effect, gate chính thức là inconclusive và full scale không được phép. Candidate tiếp theo phải là single-cell margin-drop, không dùng ridge map làm explanation.
 - 2026-08-17: Artifact audit xác nhận single-cell margin reliability đúng unit subject: A06 `0,9226` (66→61 positive cells), A07 `0,8040` (66→55); group cosine `0,7668` không dùng làm headline. Fixed-count randomized masks còn làm coefficient-sum không identifiable, nên ridge branch đóng vĩnh viễn.
 - 2026-08-17: PhysioNet seed-42 single-cell margin gate fail: mọi cosine finite nhưng median per-subject chỉ `0,3578` so với gate `0,70`, và chỉ `3/18=0,1667` subject đạt `>=0,50` so với yêu cầu 2/3. Group cosine `0,6346` không override subject gate. Theo predeclared rule, dừng XAI; không chạy Sleep, PED v2 hoặc full method scale.
+- 2026-08-17: Artifact audit định lượng được nguyên nhân PhysioNet fail và nó không phải estimator. Signal-to-noise của map là `4,31` ở BCI so với `1,49` ở PhysioNet, do PhysioNet chỉ có 90 row/subject (BCI ~490) và effect nhỏ hơn một nửa (max margin drop `0,144` so với `0,274`). Cắt BCI xuống đúng 44 row/subject/nửa cũng chỉ còn `0,722/0,541`, dưới gate. Forecast trước đó nói PhysioNet sẽ pass là sai vì đọc trục theo row/class thay vì row/nửa.
+- 2026-08-17: Vì PhysioNet hết dữ liệu ở 90 row/subject nhưng Sleep có median `2.386` epoch/subject, quyết định mở đúng một pilot Sleep sample-size amendment v3 trước khi đóng XAI vĩnh viễn. Đây là thực thi tier Sleep đã có trong plan, không phải đổi gate sau khi thấy kết quả: gate subject-level giữ nguyên `median>=0,70` và `>=2/3 subject >=0,50`, ba outcome được khai báo trước, và cap 400 bị cấm vì lệch class composition. Một forward duy nhất ở cap 200; các mức nhỏ hơn tính offline nhờ tính lồng nhau của sha256 rank.
 
 ## Validation
 
@@ -489,4 +544,8 @@ Existing foundation proof completed on 2026-08-13/14:
 
 ## Result
 
-Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher headline và XAI raw-PED claims bị rút lại. Margin-drop reliable trên hai BCI validation subjects nhưng fail cross-subject PhysioNet gate (`median=0,3578`, `3/18 >=0,50`). XAI branch dừng theo rule đã khóa; không còn experiment scale được phép nếu không có một paper-plan mới do người dùng phê duyệt.
+Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher headline và XAI raw-PED claims bị rút lại. Margin-drop reliable trên hai BCI validation subjects nhưng fail cross-subject PhysioNet gate (`median=0,3578`, `3/18 >=0,50`).
+
+Nguyên nhân fail đã được định lượng là trial/subject chứ không phải estimator: signal-to-noise `4,31` (BCI, ~490 row/subject) so với `1,49` (PhysioNet, 90 row/subject), và BCI cắt xuống ngân sách PhysioNet cũng chỉ còn `0,722/0,541`. PhysioNet không còn dữ liệu để lấy thêm, nhưng Sleep-EDF có median `2.386` epoch/subject nên ràng buộc này là tự đặt qua cap 20.
+
+XAI branch tạm dừng với đúng một exception đã khai báo trước: Sleep sample-size amendment v3 (một forward ở cap 200, curve `48/121/237/451`, cùng gate subject-level, cộng fidelity leg cho Sleep và BCI). Ngoài pilot này, không experiment scale nào được phép nếu không có paper-plan mới do người dùng phê duyệt. Nếu amendment v3 fail theo outcome 2 hoặc 3, XAI đóng và negative result được báo kèm ngưỡng trial/subject định lượng.

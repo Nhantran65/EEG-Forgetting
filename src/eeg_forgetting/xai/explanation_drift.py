@@ -300,12 +300,13 @@ def score_spectral_masks(
     )
     model.eval()
     weights = cell_weights.to(device=device, dtype=torch.float32)
-    truth, subjects, margin_batches = [], [], []
+    truth, subjects, margin_batches, prediction_batches = [], [], [], []
     for signals, labels, batch_subjects in loader:
         signals = signals.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
         batch = signals.shape[0]
         chunks = []
+        prediction_chunks = []
         for start in range(0, weights.shape[0], mask_chunk_size):
             chunk = weights[start : start + mask_chunk_size]
             count = chunk.shape[0]
@@ -328,13 +329,16 @@ def score_spectral_masks(
                 torch.full_like(repeated_labels.unsqueeze(-1), -torch.inf, dtype=logits.dtype),
             ).max(dim=2).values
             chunks.append((true_logit - competitors).cpu().numpy())
+            prediction_chunks.append(logits.argmax(dim=2).cpu().numpy())
         margin_batches.append(np.concatenate(chunks, axis=0))
+        prediction_batches.append(np.concatenate(prediction_chunks, axis=0))
         truth.append(labels.cpu().numpy())
         subjects.extend(str(value) for value in batch_subjects)
     return {
         "truth": np.concatenate(truth),
         "subjects": np.asarray(subjects, dtype=np.str_),
         "margins": np.concatenate(margin_batches, axis=1),
+        "predictions": np.concatenate(prediction_batches, axis=1),
         "indices": np.asarray(indices, dtype=np.int64),
     }
 
@@ -353,6 +357,37 @@ def subject_equal_margin_drop(
         subject: (baseline[subject_array == subject][None, :] - masked[:, subject_array == subject]).mean(axis=1)
         for subject in sorted(set(subject_array))
     }
+    return np.mean(np.stack(list(by_subject.values())), axis=0), by_subject
+
+
+def subject_class_balanced_margin_drop(
+    baseline_margin: np.ndarray,
+    masked_margins: np.ndarray,
+    labels: Sequence[int],
+    subjects: Sequence[str],
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Average margin drop within class, then equally across classes and subjects."""
+    baseline = np.asarray(baseline_margin, dtype=np.float64)
+    masked = np.asarray(masked_margins, dtype=np.float64)
+    label_array = np.asarray(labels, dtype=np.int64)
+    subject_array = np.asarray(subjects, dtype=np.str_)
+    if (
+        masked.ndim != 2
+        or masked.shape[1] != baseline.size
+        or label_array.size != baseline.size
+        or subject_array.size != baseline.size
+    ):
+        raise DatasetProtocolError("class-balanced margin arrays do not align")
+    by_subject = {}
+    for subject in sorted(set(subject_array)):
+        subject_rows = subject_array == subject
+        class_effects = []
+        for label in sorted(set(label_array[subject_rows])):
+            rows = subject_rows & (label_array == label)
+            class_effects.append(
+                (baseline[rows][None, :] - masked[:, rows]).mean(axis=1)
+            )
+        by_subject[subject] = np.mean(np.stack(class_effects), axis=0)
     return np.mean(np.stack(list(by_subject.values())), axis=0), by_subject
 
 

@@ -193,6 +193,18 @@ def test_margin_mask_reliability_v2_is_single_checkpoint_go_no_go() -> None:
     assert config["cache"]["test_access"] == "forbidden"
 
 
+def test_sleep_sample_size_amendment_is_one_bounded_final_pilot() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "sleep_sample_size_amendment_v3.yaml"
+    )
+    assert config["status"] == "locked_xai_reliability_pilot"
+    assert list(config["sample_size_curve"]["caps"]) == [20, 50, 100, 200]
+    assert config["sample_size_curve"]["aggregation"].startswith("mean_within_class")
+    assert config["sleep_fidelity"]["combinations"] == 120
+    assert config["sleep_fidelity"]["require_margin_and_ba"] is True
+    assert config["decision"]["fail"] == "stop_xai"
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"
