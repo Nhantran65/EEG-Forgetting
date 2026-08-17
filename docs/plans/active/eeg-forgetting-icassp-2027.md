@@ -349,7 +349,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Khóa XAI config/operator/schema và viết synthetic/unit proof.
 - [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
-- [ ] Chạy reliability amendment v2 trên BCI Before seed 42; không mở scale cũ.
+- [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -438,6 +438,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: Trước khi mở các directed transition khác, khóa task-specific attribution validation cho PhysioNet và Sleep. Cả hai hash-rank tối đa 20 validation row trong từng subject/class rồi chia fit/gate: PhysioNet 720/720, Sleep 732/732. Cap này giữ subject/class coverage, giảm Sleep từ 39.580 epoch mà không đọc test hoặc fit thống kê tín hiệu; BCI pilot assignment cũ không đổi.
 - 2026-08-15: Representative three-seed gates được khóa là PhysioNet←Sleep tại sequential forward stage 2→3 và Sleep←PhysioNet tại sequential reverse stage 1→2, kèm joint reference cùng seed. Mỗi task phải được đánh giá fidelity, continuous IG agreement và PED-vs-null trước khi scale checkpoint của task đó.
 - 2026-08-17: External artifact audit xác nhận XAI v1 không reliable: raw PED ordering không được dùng làm method claim. Story chuyển thành reliability-aware physiological explanation drift; training/checkpoint/performance forgetting giữ nguyên. Chỉ XAI estimator được thay, bắt đầu bằng một BCI-Before-seed-42 margin/random-mask ridge pilot.
+- 2026-08-17: Reliability v2 pilot xác nhận core idea nhưng bác bỏ additive surrogate: exact seed-42 v1 BA-drop cosine `0,3498`; single-cell margin-drop tăng lên `0,7668`; randomized-mask ridge coefficient cosine `0,9068` và per-subject `0,9214/0,9266`, nhưng held-out mask `R²=-1,4976/-0,9388`. Vì ridge không predict được unseen mask effect, gate chính thức là inconclusive và full scale không được phép. Candidate tiếp theo phải là single-cell margin-drop, không dùng ridge map làm explanation.
 
 ## Validation
 
@@ -474,7 +475,8 @@ Existing foundation proof completed on 2026-08-13/14:
 - XAI implementation validation: locked-config dry run strict-loaded all three pilot checkpoints and verified 982 validation rows, frozen 489/493 split, 110-cell registry and all cache/checkpoint/config digests. Full repository suite passed `97 passed`; focused proof covers continuous-trial rFFT reconstruction, exact band removal, NumPy frozen-index handling, subject-equal reliance, base-2 JSD, spectral-mask IG completeness and legacy-summary compatibility.
 - RQ2 BCI←Sleep scale preflight strict-loaded before/after checkpoints từ Sequential-forward-3407, EWC-challenging-42 và DER++-forward-2026, đồng thời verified parent config/summary/result/stage/checkpoint/cache/split digests. Full repository suite passed `99 passed` trước launch.
 - PhysioNet/Sleep attribution preflight strict-loaded sequential before/after và joint checkpoint, verified capped assignment SHA cùng validation/test-cache SHA, và full repository suite passed `102 passed` trước launch.
+- Reliability v2 preflight strict-loaded exact BCI-Before seed-42 checkpoint, verified frozen split/test-blind digests, passed synthetic continuous-margin/ridge recovery proof và full suite `106 passed`. Immutable result SHA-256 `946a7044...30d17bc`; margin-score artifact SHA-256 `171a0ac1...0fb35dc`.
 
 ## Result
 
-Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và performance forgetting đều hợp lệ. Fisher headline fail; XAI v1 cũng fail measurement reliability nên mọi raw-PED method conclusion bị rút lại. Active work duy nhất là reliability v2 pilot BCI Before seed 42; không train lại model và chưa được chạy full XAI scale.
+Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher headline và XAI v1 raw-PED claims bị rút lại. Reliability pilot cho thấy single-cell margin-drop giải quyết split-half instability trên BCI (`0,7668`), nhưng randomized-mask ridge không faithful trên held-out masks dù coefficient ổn định. Full scale vẫn bị chặn; bước nhỏ kế tiếp là xác nhận single-cell margin reliability trên một PhysioNet checkpoint trước khi đổi protocol chính.
