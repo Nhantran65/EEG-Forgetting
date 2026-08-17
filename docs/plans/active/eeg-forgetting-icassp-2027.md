@@ -408,9 +408,9 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
 - [x] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42; gate fail và XAI scale dừng.
-- [ ] Chạy Sleep sample-size amendment v3: một forward ở cap 200 trên Sleep-Before-PhysioNet seed 42, báo curve `48/121/237/451` row/subject/nửa từ cùng artifact.
-- [ ] Chạy fidelity leg cho margin-drop: Sleep top `3/10` exhaustive `C(10,3)=120`, và BCI-Before seed 42 còn nợ.
-- [ ] Quyết định đóng hay mở lại XAI theo ba outcome đã khai báo trong amendment v3.
+- [x] Chạy Sleep sample-size amendment v3: một forward ở cap 200 trên Sleep-Before-PhysioNet seed 42, báo curve `48/121/237/451` row/subject/nửa từ cùng artifact.
+- [x] Chạy fidelity leg cho margin-drop: Sleep top `3/10` exhaustive `C(10,3)=120`, và BCI-Before seed 42.
+- [x] Đóng XAI: Sleep reliability pass nhưng exhaustive fidelity fail cả margin và BA.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -504,6 +504,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-17: PhysioNet seed-42 single-cell margin gate fail: mọi cosine finite nhưng median per-subject chỉ `0,3578` so với gate `0,70`, và chỉ `3/18=0,1667` subject đạt `>=0,50` so với yêu cầu 2/3. Group cosine `0,6346` không override subject gate. Theo predeclared rule, dừng XAI; không chạy Sleep, PED v2 hoặc full method scale.
 - 2026-08-17: Artifact audit định lượng được nguyên nhân PhysioNet fail và nó không phải estimator. Signal-to-noise của map là `4,31` ở BCI so với `1,49` ở PhysioNet, do PhysioNet chỉ có 90 row/subject (BCI ~490) và effect nhỏ hơn một nửa (max margin drop `0,144` so với `0,274`). Cắt BCI xuống đúng 44 row/subject/nửa cũng chỉ còn `0,722/0,541`, dưới gate. Forecast trước đó nói PhysioNet sẽ pass là sai vì đọc trục theo row/class thay vì row/nửa.
 - 2026-08-17: Vì PhysioNet hết dữ liệu ở 90 row/subject nhưng Sleep có median `2.386` epoch/subject, quyết định mở đúng một pilot Sleep sample-size amendment v3 trước khi đóng XAI vĩnh viễn. Đây là thực thi tier Sleep đã có trong plan, không phải đổi gate sau khi thấy kết quả: gate subject-level giữ nguyên `median>=0,70` và `>=2/3 subject >=0,50`, ba outcome được khai báo trước, và cap 400 bị cấm vì lệch class composition. Một forward duy nhất ở cap 200; các mức nhỏ hơn tính offline nhờ tính lồng nhau của sha256 rank.
+- 2026-08-17: Final Sleep amendment outcome: margin reliability pass rất mạnh ngay cap 20/50/100/200 với median subject cosine `0,9707/0,9898/0,9924/0,9967` và 15/15 subject `>=0,50` ở mọi cap. Vì vậy sample size không phải blocker cho Sleep. BCI margin fidelity pass (`BA drop 0,2506 > p95 0,1211`; margin drop `1,9042 > p95 0,7249`). Sleep exhaustive top-3 fidelity fail cả BA (`0,2999 < p95 0,3651`) và margin (`1,4805 < p95 2,0358`), cho thấy individually stable ranking không tạo thành faithful multi-cell set. Theo locked conjunction gate, XAI đóng; không PED/method scale.
 
 ## Validation
 
@@ -548,4 +549,4 @@ Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher
 
 Nguyên nhân fail đã được định lượng là trial/subject chứ không phải estimator: signal-to-noise `4,31` (BCI, ~490 row/subject) so với `1,49` (PhysioNet, 90 row/subject), và BCI cắt xuống ngân sách PhysioNet cũng chỉ còn `0,722/0,541`. PhysioNet không còn dữ liệu để lấy thêm, nhưng Sleep-EDF có median `2.386` epoch/subject nên ràng buộc này là tự đặt qua cap 20.
 
-XAI branch tạm dừng với đúng một exception đã khai báo trước: Sleep sample-size amendment v3 (một forward ở cap 200, curve `48/121/237/451`, cùng gate subject-level, cộng fidelity leg cho Sleep và BCI). Ngoài pilot này, không experiment scale nào được phép nếu không có paper-plan mới do người dùng phê duyệt. Nếu amendment v3 fail theo outcome 2 hoặc 3, XAI đóng và negative result được báo kèm ngưỡng trial/subject định lượng.
+Final Sleep exception đã hoàn tất. Margin maps reliable trên BCI và Sleep, nhưng cross-subject PhysioNet reliability fail; BCI fidelity pass còn Sleep exhaustive fidelity fail. Vì reliability không đủ trên PhysioNet và stable Sleep ranking không faithful dưới exact top-3 intervention, XAI đóng theo predeclared gate. Không experiment XAI nào còn được phép nếu không có paper-plan mới do người dùng phê duyệt; training và performance-forgetting artifacts vẫn hợp lệ.
