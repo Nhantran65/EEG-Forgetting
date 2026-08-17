@@ -224,6 +224,13 @@ scale bị cấm trước khi pilot này pass. Nếu pass, drift v2 dùng symmet
 cross-minus-within estimator; repeated splits chỉ đo uncertainty, không được
 coi là independent inferential samples.
 
+Pilot outcome loại ridge vì held-out `R²` âm dù coefficient cosine cao. Protocol
+candidate được rút gọn thành single-cell margin-drop. Reliability unit chính là
+subject: BCI A06/A07 đạt `0,9226/0,8040`; group-mean chỉ là secondary. Gate kế
+tiếp dùng đúng một PhysioNet-Before-Sleep seed-42 checkpoint: mọi subject cosine
+phải finite, median `>=0,70`, và ít nhất 2/3 subject `>=0,50`. Không PED/IG/full
+scale trước gate này.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -350,6 +357,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
+- [ ] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -439,6 +447,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: Representative three-seed gates được khóa là PhysioNet←Sleep tại sequential forward stage 2→3 và Sleep←PhysioNet tại sequential reverse stage 1→2, kèm joint reference cùng seed. Mỗi task phải được đánh giá fidelity, continuous IG agreement và PED-vs-null trước khi scale checkpoint của task đó.
 - 2026-08-17: External artifact audit xác nhận XAI v1 không reliable: raw PED ordering không được dùng làm method claim. Story chuyển thành reliability-aware physiological explanation drift; training/checkpoint/performance forgetting giữ nguyên. Chỉ XAI estimator được thay, bắt đầu bằng một BCI-Before-seed-42 margin/random-mask ridge pilot.
 - 2026-08-17: Reliability v2 pilot xác nhận core idea nhưng bác bỏ additive surrogate: exact seed-42 v1 BA-drop cosine `0,3498`; single-cell margin-drop tăng lên `0,7668`; randomized-mask ridge coefficient cosine `0,9068` và per-subject `0,9214/0,9266`, nhưng held-out mask `R²=-1,4976/-0,9388`. Vì ridge không predict được unseen mask effect, gate chính thức là inconclusive và full scale không được phép. Candidate tiếp theo phải là single-cell margin-drop, không dùng ridge map làm explanation.
+- 2026-08-17: Artifact audit xác nhận single-cell margin reliability đúng unit subject: A06 `0,9226` (66→61 positive cells), A07 `0,8040` (66→55); group cosine `0,7668` không dùng làm headline. Fixed-count randomized masks còn làm coefficient-sum không identifiable, nên ridge branch đóng vĩnh viễn.
 
 ## Validation
 

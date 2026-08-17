@@ -1,0 +1,45 @@
+schema_version: 2
+id: physionet_margin_reliability_v2
+status: locked_xai_reliability_pilot
+task: physionet_mi
+seed: 42
+checkpoint:
+  role: physionet_before_sleep
+  path: results/continual/sequential_ft_v1/forward/seed-42/stage-02-physionet_mi/checkpoint.pt
+  sha256: 455f87b6ba70dcfff130f3fcf18465863854a59f478bf046b01ec965b4505014
+  parent_config: configs/training/sequential_ft_v1.yaml
+  parent_config_sha256: 6d0b202f5a734a91a56c317584f9943a244c708ddc10f60ccec2ef12e042f3a7
+  expected_stage: 2
+  expected_task: physionet_mi
+cache:
+  validation_index: data/processed/v3/physionet_mi/validation/index.json
+  validation_index_sha256: da85eabef14e307d8d932790dcf3b1ab996ce90e015fd27af01968c02140b18c
+  validation_samples: 1620
+  validation_subjects: [S071, S072, S073, S074, S075, S076, S077, S078, S079, S080, S081, S082, S083, S084, S085, S086, S087, S089]
+  test_index: data/processed/v3/physionet_mi/test/index.json
+  test_index_sha256: 1111ad13ff4b62cc435e71ea5169a54143e0c29cfe6f512b309a82bca39d96f8
+  test_access: forbidden
+attribution_split:
+  method: sha256_rank_capped_within_subject_class_v1
+  seed: 20260818
+  maximum_rows_per_subject_class: 20
+  attribution_fit_samples: 720
+  attribution_gate_samples: 720
+  assignment_sha256: 419fafc23fec9f304086594531b868a9d2dba40f7c52fa186eb01aab39c81974
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+evaluation: {batch_size: 16, mask_chunk_size: 4}
+gate:
+  all_subject_cosines_finite: true
+  minimum_median_subject_cosine: 0.70
+  subject_threshold: 0.50
+  minimum_subject_fraction_at_threshold: 0.6666666666666666
+output: {root: results/xai/physionet_margin_reliability_v2, immutable: true}
+purpose: cross_subject_go_no_go_for_single_cell_margin_attribution
