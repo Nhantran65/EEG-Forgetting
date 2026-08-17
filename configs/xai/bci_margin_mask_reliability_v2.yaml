@@ -1,0 +1,68 @@
+schema_version: 2
+id: bci_margin_mask_reliability_v2
+status: locked_xai_reliability_pilot
+task: bciciv2a
+seed: 42
+checkpoint:
+  role: exact_budget_bci_only_before_sleep
+  path: results/continual/sequential_pairwise_clean_v1/bci_to_sleep/seed-42/stage-01-bciciv2a/checkpoint.pt
+  sha256: 8ec20a59c56c4ad71c36355ce1897a6c3f5118233cd580bd2d813f843d01d81e
+  parent_config: configs/training/sequential_pairwise_clean_v1.yaml
+  parent_config_sha256: 667755d2c7eaf10f90ab68633e88927f661dd858804856db2b10d3a52d354f24
+  expected_stage: 1
+  expected_task: bciciv2a
+v1_reference:
+  result: results/xai/bci_sleep_explanation_drift_replication_v2/seed-42/result.json
+  result_sha256: 2bcc951efec750ffd99af9bf80a665ac19d8e7d1a73531c653922c520021c991
+  role: before
+cache:
+  validation_index: data/processed/v3/bciciv2a/validation/index.json
+  validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+  validation_samples: 982
+  validation_subjects: [A06, A07]
+  test_index: data/processed/v3/bciciv2a/test/index.json
+  test_index_sha256: f6c7bcf2a7f9fb689bd506c25224887a64b5c6544b59d27bdcf1869d08973103
+  test_access: forbidden
+attribution_split:
+  method: sha256_rank_within_subject_class_v1
+  seed: 20260815
+  attribution_fit_samples: 489
+  attribution_gate_samples: 493
+  assignment_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+single_cell_margin:
+  include_unoccluded_baseline: true
+randomized_masks:
+  total: 200
+  ridge_train: 160
+  held_out: 40
+  occluded_cells_per_mask: 22
+  unique_masks: true
+  seed: 20260821
+ridge:
+  alpha: 1.0
+  fit_intercept: true
+evaluation:
+  batch_size: 16
+  mask_chunk_size: 4
+gate:
+  primary_metric: split_half_signed_coefficient_cosine
+  pass_at_or_above: 0.70
+  inconclusive_at_or_above: 0.40
+  held_out_r2_must_be_positive: true
+  actions:
+    pass: allow_task_level_validation
+    inconclusive: allow_one_sample_or_mask_budget_increase
+    fail: stop_xai
+output:
+  root: results/xai/bci_margin_mask_reliability_v2
+  immutable: true
+purpose: go_no_go_for_reliability_aware_explanation_drift

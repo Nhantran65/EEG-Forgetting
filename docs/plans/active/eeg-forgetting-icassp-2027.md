@@ -202,6 +202,28 @@ Metric chính chuẩn hóa theo headroom:
 
 ## Attribution Validation And Scale Gate
 
+### Reliability amendment v2 — 2026-08-17
+
+XAI v1 dùng single-cell BA drop không đạt điều kiện đo lường: BCI Before
+split-half signed-map cosine chỉ khoảng `0,23` trên 18 main cells và 16/18
+BCI←Sleep PED không vượt same-checkpoint null. Các raw PED cũ được giữ làm
+diagnostic failure, không còn là bằng chứng RQ2.
+
+Trước mọi XAI scale mới, chạy đúng một reliability pilot trên BCI-only Before
+checkpoint seed 42, cùng frozen validation fit/gate và không đọc test. So sánh:
+
+1. single-cell BA-drop v1 đã lưu;
+2. single-cell classification-margin drop;
+3. 200 randomized masks, mỗi mask che 20% cell, rồi fixed-ridge regression từ
+   margin drop sang 110 cell coefficients.
+
+Primary go/no-go là split-half cosine của ridge coefficient map: `>=0,70` pass,
+`0,40–0,70` chỉ cho phép một lần tăng sample/mask budget, `<0,40` dừng XAI.
+Held-out mask prediction phải có finite positive `R²`. Full three-task/method
+scale bị cấm trước khi pilot này pass. Nếu pass, drift v2 dùng symmetric
+cross-minus-within estimator; repeated splits chỉ đo uncertainty, không được
+coi là independent inferential samples.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -327,6 +349,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Khóa XAI config/operator/schema và viết synthetic/unit proof.
 - [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
+- [ ] Chạy reliability amendment v2 trên BCI Before seed 42; không mở scale cũ.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -414,6 +437,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-15: BCI←Sleep RQ2 scale hoàn tất 18/18: mean `F_rel/PED` Sequential `0,3016/0,4891`, EWC `0,1087/0,2438`, DER++ `-0,0164/0,3755`. EWC và DER++ cùng giảm cả hai metric ở 5/6 paired order-seed cells; EWC fidelity pass cả role chỉ 3/6 nên explanation-retention claim của EWC yếu hơn DER++ (6/6 fidelity).
 - 2026-08-15: Trước khi mở các directed transition khác, khóa task-specific attribution validation cho PhysioNet và Sleep. Cả hai hash-rank tối đa 20 validation row trong từng subject/class rồi chia fit/gate: PhysioNet 720/720, Sleep 732/732. Cap này giữ subject/class coverage, giảm Sleep từ 39.580 epoch mà không đọc test hoặc fit thống kê tín hiệu; BCI pilot assignment cũ không đổi.
 - 2026-08-15: Representative three-seed gates được khóa là PhysioNet←Sleep tại sequential forward stage 2→3 và Sleep←PhysioNet tại sequential reverse stage 1→2, kèm joint reference cùng seed. Mỗi task phải được đánh giá fidelity, continuous IG agreement và PED-vs-null trước khi scale checkpoint của task đó.
+- 2026-08-17: External artifact audit xác nhận XAI v1 không reliable: raw PED ordering không được dùng làm method claim. Story chuyển thành reliability-aware physiological explanation drift; training/checkpoint/performance forgetting giữ nguyên. Chỉ XAI estimator được thay, bắt đầu bằng một BCI-Before-seed-42 margin/random-mask ridge pilot.
 
 ## Validation
 
@@ -453,4 +477,4 @@ Existing foundation proof completed on 2026-08-13/14:
 
 ## Result
 
-Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và Fisher diagnostic audit đã hoàn thành. Ba-seed BCI→Sleep attribution pilot cho phép scale theo transparent amended per-gate rule nhưng cho thấy seed instability phải giữ trong claim. Active work là 18-cell BCI←Sleep Sequential/EWC/DER++ comparison; sau đó mới quyết định mở các directed transition còn lại.
+Foundation, full CL matrices, path-free transitions, BCI robustness, joint reference và performance forgetting đều hợp lệ. Fisher headline fail; XAI v1 cũng fail measurement reliability nên mọi raw-PED method conclusion bị rút lại. Active work duy nhất là reliability v2 pilot BCI Before seed 42; không train lại model và chưa được chạy full XAI scale.

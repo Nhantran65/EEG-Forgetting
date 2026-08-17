@@ -174,6 +174,25 @@ def test_physionet_and_sleep_attribution_sets_are_capped_and_test_blind() -> Non
         assert split["assignment_sha256"] == digest
 
 
+def test_margin_mask_reliability_v2_is_single_checkpoint_go_no_go() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "bci_margin_mask_reliability_v2.yaml"
+    )
+    assert config["status"] == "locked_xai_reliability_pilot"
+    assert config["seed"] == 42
+    assert config["randomized_masks"] == {
+        "total": 200,
+        "ridge_train": 160,
+        "held_out": 40,
+        "occluded_cells_per_mask": 22,
+        "unique_masks": True,
+        "seed": 20260821,
+    }
+    assert config["ridge"]["alpha"] == 1.0
+    assert config["gate"]["pass_at_or_above"] == 0.70
+    assert config["cache"]["test_access"] == "forbidden"
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"

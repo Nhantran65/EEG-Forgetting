@@ -21,7 +21,7 @@ def frozen_stratified_halves(
     labels: Sequence[int], subjects: Sequence[str], *, seed: int
 ) -> dict[str, object]:
     """Freeze row IDs into deterministic halves within every subject/class stratum."""
-    if len(labels) != len(subjects) or not labels:
+    if len(labels) != len(subjects) or len(labels) == 0:
         raise DatasetProtocolError("attribution split needs aligned non-empty rows")
     strata: dict[tuple[str, int], list[int]] = defaultdict(list)
     for index, (label, subject) in enumerate(zip(labels, subjects, strict=True)):
@@ -70,7 +70,7 @@ def frozen_stratified_capped_halves(
     """Freeze at most N hash-ranked rows per subject/class, then split in half."""
     if maximum_rows_per_subject_class < 2:
         raise DatasetProtocolError("capped attribution strata need at least two rows")
-    if len(labels) != len(subjects) or not labels:
+    if len(labels) != len(subjects) or len(labels) == 0:
         raise DatasetProtocolError("attribution split needs aligned non-empty rows")
     strata: dict[tuple[str, int], list[int]] = defaultdict(list)
     for index, (label, subject) in enumerate(zip(labels, subjects, strict=True)):
@@ -272,6 +272,114 @@ def predict_spectral_masks(
         "predictions": np.concatenate(prediction_batches, axis=1),
         "indices": np.asarray(indices, dtype=np.int64),
     }
+
+
+@torch.no_grad()
+def score_spectral_masks(
+    model: nn.Module,
+    task: str,
+    dataset: Dataset,
+    indices: Sequence[int],
+    cell_weights: Tensor,
+    *,
+    sampling_rate_hz: float,
+    bands: Sequence[Band],
+    batch_size: int,
+    mask_chunk_size: int,
+    device: torch.device,
+) -> dict[str, object]:
+    """Return true-vs-best-other classification margins under spectral masks."""
+    if cell_weights.ndim != 3 or len(indices) == 0:
+        raise DatasetProtocolError("mask scoring needs rows and 3D cell weights")
+    loader = DataLoader(
+        Subset(dataset, list(indices)),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=device.type == "cuda",
+    )
+    model.eval()
+    weights = cell_weights.to(device=device, dtype=torch.float32)
+    truth, subjects, margin_batches = [], [], []
+    for signals, labels, batch_subjects in loader:
+        signals = signals.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
+        batch = signals.shape[0]
+        chunks = []
+        for start in range(0, weights.shape[0], mask_chunk_size):
+            chunk = weights[start : start + mask_chunk_size]
+            count = chunk.shape[0]
+            repeated_signals = signals.repeat(count, 1, 1, 1)
+            repeated_weights = chunk.repeat_interleave(batch, dim=0)
+            logits = model(
+                task,
+                apply_spectral_cell_weights(
+                    repeated_signals,
+                    repeated_weights,
+                    sampling_rate_hz=sampling_rate_hz,
+                    bands=bands,
+                ),
+            ).reshape(count, batch, -1)
+            repeated_labels = labels.unsqueeze(0).expand(count, batch)
+            true_logit = logits.gather(2, repeated_labels.unsqueeze(-1))[..., 0]
+            competitors = logits.scatter(
+                2,
+                repeated_labels.unsqueeze(-1),
+                torch.full_like(repeated_labels.unsqueeze(-1), -torch.inf, dtype=logits.dtype),
+            ).max(dim=2).values
+            chunks.append((true_logit - competitors).cpu().numpy())
+        margin_batches.append(np.concatenate(chunks, axis=0))
+        truth.append(labels.cpu().numpy())
+        subjects.extend(str(value) for value in batch_subjects)
+    return {
+        "truth": np.concatenate(truth),
+        "subjects": np.asarray(subjects, dtype=np.str_),
+        "margins": np.concatenate(margin_batches, axis=1),
+        "indices": np.asarray(indices, dtype=np.int64),
+    }
+
+
+def subject_equal_margin_drop(
+    baseline_margin: np.ndarray,
+    masked_margins: np.ndarray,
+    subjects: Sequence[str],
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    baseline = np.asarray(baseline_margin, dtype=np.float64)
+    masked = np.asarray(masked_margins, dtype=np.float64)
+    subject_array = np.asarray(subjects, dtype=np.str_)
+    if masked.ndim != 2 or masked.shape[1] != baseline.size or subject_array.size != baseline.size:
+        raise DatasetProtocolError("margin arrays do not align")
+    by_subject = {
+        subject: (baseline[subject_array == subject][None, :] - masked[:, subject_array == subject]).mean(axis=1)
+        for subject in sorted(set(subject_array))
+    }
+    return np.mean(np.stack(list(by_subject.values())), axis=0), by_subject
+
+
+def ridge_mask_coefficients(
+    indicators: np.ndarray, responses: np.ndarray, *, alpha: float
+) -> tuple[np.ndarray, float]:
+    x = np.asarray(indicators, dtype=np.float64)
+    y = np.asarray(responses, dtype=np.float64)
+    if x.ndim != 2 or y.shape != (x.shape[0],) or alpha <= 0:
+        raise DatasetProtocolError("invalid randomized-mask ridge inputs")
+    x_mean = x.mean(axis=0)
+    y_mean = float(y.mean())
+    centered = x - x_mean
+    coefficients = np.linalg.solve(
+        centered.T @ centered + alpha * np.eye(x.shape[1]), centered.T @ (y - y_mean)
+    )
+    intercept = y_mean - float(x_mean @ coefficients)
+    return coefficients, intercept
+
+
+def cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
+    left = np.asarray(left, dtype=np.float64)
+    right = np.asarray(right, dtype=np.float64)
+    denominator = float(np.linalg.norm(left) * np.linalg.norm(right))
+    if left.shape != right.shape or left.ndim != 1 or denominator <= 0:
+        raise DatasetProtocolError("cosine similarity needs aligned nonzero vectors")
+    return float(left @ right / denominator)
 
 
 def positive_distribution(values: Sequence[float] | np.ndarray) -> np.ndarray:

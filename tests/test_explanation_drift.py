@@ -10,7 +10,10 @@ from eeg_forgetting.xai.explanation_drift import (
     frozen_stratified_halves,
     jensen_shannon_divergence,
     reliance_maps,
+    ridge_mask_coefficients,
+    score_spectral_masks,
     spectral_mask_integrated_gradients,
+    subject_equal_margin_drop,
 )
 
 
@@ -129,3 +132,45 @@ def test_numpy_index_array_is_accepted_by_dataset_instruments() -> None:
         device=torch.device("cpu"),
     )
     assert result["predictions"].shape == (1, 1)
+
+
+def test_margin_scoring_and_subject_equal_drop_are_continuous() -> None:
+    class _Dataset(torch.utils.data.Dataset):
+        def __len__(self) -> int:
+            return 2
+
+        def __getitem__(self, index: int):
+            time = torch.arange(800) / 200.0
+            signal = ((index + 1) * torch.sin(2 * torch.pi * 10 * time)).reshape(
+                1, 4, 200
+            )
+            return signal, torch.tensor(0), "A" if index == 0 else "B"
+
+    scored = score_spectral_masks(
+        _BandEnergyModel(),
+        "task",
+        _Dataset(),
+        [0, 1],
+        torch.tensor([[[1.0, 1.0]], [[0.0, 0.0]]]),
+        sampling_rate_hz=200.0,
+        bands=BANDS,
+        batch_size=2,
+        mask_chunk_size=2,
+        device=torch.device("cpu"),
+    )
+    aggregate, by_subject = subject_equal_margin_drop(
+        scored["margins"][0], scored["margins"][1:], scored["subjects"]
+    )
+    assert aggregate.shape == (1,)
+    assert aggregate[0] > 0
+    assert set(by_subject) == {"A", "B"}
+
+
+def test_ridge_mask_coefficients_recover_synthetic_additive_effects() -> None:
+    generator = np.random.default_rng(11)
+    indicators = generator.integers(0, 2, size=(200, 4)).astype(float)
+    expected = np.array([0.4, -0.2, 0.1, 0.7])
+    responses = 0.3 + indicators @ expected
+    observed, intercept = ridge_mask_coefficients(indicators, responses, alpha=1e-8)
+    assert observed == pytest.approx(expected, abs=1e-7)
+    assert intercept == pytest.approx(0.3, abs=1e-7)
