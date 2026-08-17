@@ -34,6 +34,7 @@ def _expected_sample_shape(dataset: str, protocol: str = "main") -> tuple[int, i
         return (64, 4, 200)
     shapes = {
         "bciciv2a": (22, 4, 200),
+        "high_gamma": (22, 4, 200),
         "physionet_mi": (22, 4, 200),
         "sleep_edf_sc": (2, 30, 200),
     }

@@ -22,9 +22,15 @@ from eeg_forgetting.models.cbramod import CBraModTaskModel, load_pretrained_back
 from .metrics import balanced_accuracy, subject_balanced_accuracy
 
 
-TASK_CLASSES = {"bciciv2a": 4, "physionet_mi": 4, "sleep_edf_sc": 5}
+TASK_CLASSES = {
+    "bciciv2a": 4,
+    "high_gamma": 4,
+    "physionet_mi": 4,
+    "sleep_edf_sc": 5,
+}
 TASK_SHAPES = {
     "bciciv2a": (22, 4),
+    "high_gamma": (22, 4),
     "physionet_mi": (22, 4),
     "sleep_edf_sc": (2, 30),
 }

@@ -205,6 +205,20 @@ def test_sleep_sample_size_amendment_is_one_bounded_final_pilot() -> None:
     assert config["decision"]["fail"] == "stop_xai"
 
 
+def test_high_gamma_replacement_candidate_is_locked_before_download() -> None:
+    dataset = load_yaml(ROOT / "configs" / "datasets" / "high_gamma.yaml")
+    pilot = load_yaml(ROOT / "configs" / "pilots" / "high_gamma_candidate_v1.yaml")
+    assert dataset["status"] == "locked_replacement_candidate"
+    assert dataset["subject_split"] == {
+        "train": [1, 2, 3, 4, 5, 6, 7],
+        "validation": [8, 9, 10, 11],
+        "test": [12, 13, 14],
+    }
+    assert dataset["channel_montage"] == "bciciv2a_22"
+    assert pilot["training"]["optimizer_steps"] == 2500
+    assert pilot["test_access"] == "forbidden"
+
+
 def test_converged_single_task_early_stopping_is_locked() -> None:
     config = load_yaml(ROOT / "configs" / "training" / "single_task_converged.yaml")
     assert config["mode"] == "converged"

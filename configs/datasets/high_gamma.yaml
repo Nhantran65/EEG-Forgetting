@@ -1,0 +1,31 @@
+schema_version: 1
+id: high_gamma
+status: locked_replacement_candidate
+source: NEMAR nm000172 v1.0.2
+doi: 10.82901/nemar.nm000172
+license: CC-BY-4.0
+subjects: 14
+classes: [left_hand, right_hand, feet, rest]
+source_sampling_rate_hz: 500
+target_sampling_rate_hz: 200
+window_seconds_from_event_onset: [0.0, 4.0]
+channel_montage: bciciv2a_22
+common_average_reference: true
+bandpass_hz: [0.5, 40.0]
+normalization: microvolt_divided_by_100
+subject_split:
+  train: [1, 2, 3, 4, 5, 6, 7]
+  validation: [8, 9, 10, 11]
+  test: [12, 13, 14]
+acquisitions_per_subject: [train, test]
+assertions:
+  channels_in_source: 128
+  classes_per_subject: 4
+  minimum_trials_per_subject: 400
+  duration_seconds: 4.0
+  balanced_classes_within_one_trial: true
+source_pin:
+  manifest: data/raw/high_gamma/nm000172-v1.0.2/manifest.json
+  manifest_sha256: 095d69f36b0818eb0df761065edb3fc4c51a4576ca16e0a030a2b0b1e4a2621f
+  published_version: v1.0.2
+purpose: reliability_gate_candidate_only_not_yet_in_main_cl_matrix

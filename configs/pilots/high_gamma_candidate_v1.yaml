@@ -1,0 +1,24 @@
+schema_version: 1
+id: high_gamma_candidate_v1
+status: locked_replacement_candidate
+dataset: high_gamma
+seed: 42
+model:
+  head: flatten_mlp
+  plastic_final_encoder_blocks: 4
+training:
+  optimizer_steps: 2500
+  batch_size: 64
+  validation_interval_steps: 100
+  backbone_learning_rate: 0.0001
+  head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  minimum_learning_rate: 0.000001
+checkpoints:
+  reliability_source: exact_final_step
+  best_validation: diagnostic_only
+cache_root: data/processed/high_gamma_candidate_v1
+test_access: forbidden
+purpose: train_one_seed_before_high_gamma_margin_reliability_gate
