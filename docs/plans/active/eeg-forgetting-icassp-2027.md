@@ -357,7 +357,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
 - [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
 - [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
-- [ ] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42.
+- [x] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42; gate fail và XAI scale dừng.
 - [ ] Tổng hợp PED/performance alignment, hai figures và một table.
 
 ### Completed execution history — 2026-08-14
@@ -448,6 +448,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-17: External artifact audit xác nhận XAI v1 không reliable: raw PED ordering không được dùng làm method claim. Story chuyển thành reliability-aware physiological explanation drift; training/checkpoint/performance forgetting giữ nguyên. Chỉ XAI estimator được thay, bắt đầu bằng một BCI-Before-seed-42 margin/random-mask ridge pilot.
 - 2026-08-17: Reliability v2 pilot xác nhận core idea nhưng bác bỏ additive surrogate: exact seed-42 v1 BA-drop cosine `0,3498`; single-cell margin-drop tăng lên `0,7668`; randomized-mask ridge coefficient cosine `0,9068` và per-subject `0,9214/0,9266`, nhưng held-out mask `R²=-1,4976/-0,9388`. Vì ridge không predict được unseen mask effect, gate chính thức là inconclusive và full scale không được phép. Candidate tiếp theo phải là single-cell margin-drop, không dùng ridge map làm explanation.
 - 2026-08-17: Artifact audit xác nhận single-cell margin reliability đúng unit subject: A06 `0,9226` (66→61 positive cells), A07 `0,8040` (66→55); group cosine `0,7668` không dùng làm headline. Fixed-count randomized masks còn làm coefficient-sum không identifiable, nên ridge branch đóng vĩnh viễn.
+- 2026-08-17: PhysioNet seed-42 single-cell margin gate fail: mọi cosine finite nhưng median per-subject chỉ `0,3578` so với gate `0,70`, và chỉ `3/18=0,1667` subject đạt `>=0,50` so với yêu cầu 2/3. Group cosine `0,6346` không override subject gate. Theo predeclared rule, dừng XAI; không chạy Sleep, PED v2 hoặc full method scale.
 
 ## Validation
 
@@ -488,4 +489,4 @@ Existing foundation proof completed on 2026-08-13/14:
 
 ## Result
 
-Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher headline và XAI v1 raw-PED claims bị rút lại. Reliability pilot cho thấy single-cell margin-drop giải quyết split-half instability trên BCI (`0,7668`), nhưng randomized-mask ridge không faithful trên held-out masks dù coefficient ổn định. Full scale vẫn bị chặn; bước nhỏ kế tiếp là xác nhận single-cell margin reliability trên một PhysioNet checkpoint trước khi đổi protocol chính.
+Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher headline và XAI raw-PED claims bị rút lại. Margin-drop reliable trên hai BCI validation subjects nhưng fail cross-subject PhysioNet gate (`median=0,3578`, `3/18 >=0,50`). XAI branch dừng theo rule đã khóa; không còn experiment scale được phép nếu không có một paper-plan mới do người dùng phê duyệt.
