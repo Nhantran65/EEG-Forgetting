@@ -45,6 +45,8 @@ def preprocess_mne_raw(
     selected = registry.indices(source_channels, montage)
     names = [source_channels[index] for index in selected]
     prepared = raw.copy().pick(names)
+    if not prepared.preload:
+        prepared.load_data(verbose="ERROR")
     if common_average_reference:
         prepared.set_eeg_reference("average", projection=False, verbose="ERROR")
     prepared.filter(low_hz, high_hz, verbose="ERROR")
