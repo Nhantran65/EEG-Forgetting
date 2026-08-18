@@ -412,6 +412,13 @@ giữ nguyên mọi hyperparameter và lưu dưới exploratory config/result ID
 performance/checkpoints; chưa chạy PED/ensemble/`delta_A`, và không nhập các run
 này vào official summaries/manuscript.
 
+Người dùng phê duyệt chạy trọn exploratory XAI/joint alignment qua đêm. Bind đúng
+27 continual runs seeds `[7,123,999]` và sáu joint maps cùng seed đã pass gates;
+chạy 63 PED transition cells dưới result root riêng, sau đó seed-matched
+`A_before/A_after/delta_A` và 9-block bootstrap/sign test. Đây vẫn là post-gate
+sensitivity: official results/manuscript không overwrite; pass chỉ tạo trạng thái
+`eligible_for_manuscript_decision`, không tự động nhập paper.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -553,6 +560,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Gate sáu joint maps: strict all-six fail, bỏ joint hypothesis và không tính `delta_A`.
 - [x] Chạy exploratory joint seeds `[7,123,999]`; High-Gamma pass 3/3 nhưng không đổi formal gate.
 - [ ] Chạy 27 exploratory continual runs trên seeds `[7,123,999]`, result roots riêng; performance-only.
+- [ ] Chạy 27 exploratory PED cells, seed-matched joint `delta_A`, và tạo final exploratory report.
 - [x] Hoàn thiện hai figures và một table từ digest-bound replacement summary.
 - [x] Viết full ICASSP manuscript source với statistical reporting và limitations.
 

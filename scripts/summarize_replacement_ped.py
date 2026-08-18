@@ -39,7 +39,7 @@ def _resolve(value: str) -> Path:
 def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
-    if config.get("status") != "locked_xai_scale":
+    if config.get("status") not in {"locked_xai_scale", "exploratory_xai_scale"}:
         raise DatasetProtocolError("replacement PED summary config is not locked")
     config_sha = sha256_file(args.config)
     output_root = _resolve(str(config["output"]["root"]))

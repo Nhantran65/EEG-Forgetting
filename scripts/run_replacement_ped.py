@@ -110,7 +110,10 @@ def _task_data(
     config: dict[str, object], task: str
 ) -> tuple[CachedEEGDataset, dict[str, object]]:
     task_config = config["tasks"][task]
-    if task_config["status"] != "enabled_passed_reliability_and_fidelity":
+    if task_config["status"] not in {
+        "enabled_passed_reliability_and_fidelity",
+        "enabled_passed_exploratory_joint_gate",
+    }:
         raise DatasetProtocolError(f"PED task {task!r} is not enabled")
     index_path = _resolve(str(task_config["validation_index"]))
     _verify(index_path, str(task_config["validation_index_sha256"]), "validation cache")
@@ -227,7 +230,7 @@ def _score_map(
 def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
-    if config.get("status") != "locked_xai_scale":
+    if config.get("status") not in {"locked_xai_scale", "exploratory_xai_scale"}:
         raise DatasetProtocolError("replacement PED config is not locked")
     if config["scale"].get("test_access_for_xai") != "forbidden":
         raise DatasetProtocolError("replacement PED must remain validation-only")

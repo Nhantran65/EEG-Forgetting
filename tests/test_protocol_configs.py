@@ -267,6 +267,17 @@ def test_exploratory_continual_matrix_is_separate_and_not_official() -> None:
         assert config["purpose"].endswith("cannot_override_official_matrix")
 
 
+def test_exploratory_ped_scale_is_separate_and_test_blind() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "high_gamma_replacement_ped_exploratory_v1.yaml"
+    )
+    assert config["status"] == "exploratory_xai_scale"
+    assert config["scale"]["expected_run_cells"] == 27
+    assert config["scale"]["expected_transition_cells"] == 63
+    assert config["scale"]["test_access_for_xai"] == "forbidden"
+    assert config["purpose"].endswith("cannot_override_official_paper")
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"
