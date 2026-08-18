@@ -399,6 +399,13 @@ phải explanation lý tưởng hay ground truth.
   và 2–3 câu; direction/seed detail xuống supplementary. Nếu fail/null, bỏ joint
   khỏi manuscript và không mở thêm experiment.
 
+### Post-gate exploratory joint seed audit v10 — 2026-08-18
+
+Sau formal v9 fail, người dùng yêu cầu xem thêm seed. Chạy đúng ba seed cố định
+`[7,123,999]` với cùng training và XAI gates; không chọn seed theo outcome, không
+retune và không tính `delta_A`. Đây là sensitivity audit post hoc: chỉ báo pass
+rate và distribution, không được lật formal v9 decision hoặc đi vào main paper.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -538,6 +545,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Tổng hợp noise-corrected PED/performance alignment trên 63 transition cell.
 - [x] Parameterize joint mixed-task/cache roots và train `joint_high_gamma_v1` ba seed.
 - [x] Gate sáu joint maps: strict all-six fail, bỏ joint hypothesis và không tính `delta_A`.
+- [ ] Chạy exploratory joint seeds `[7,123,999]`; report-only, không đổi formal gate.
 - [x] Hoàn thiện hai figures và một table từ digest-bound replacement summary.
 - [x] Viết full ICASSP manuscript source với statistical reporting và limitations.
 

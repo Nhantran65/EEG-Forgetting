@@ -242,6 +242,15 @@ def test_joint_alignment_gate_is_strict_all_six_and_bounded() -> None:
     assert config["xai"]["test_access"] == "forbidden"
 
 
+def test_exploratory_joint_seeds_cannot_override_formal_gate() -> None:
+    config = load_yaml(ROOT / "configs" / "training" / "joint_high_gamma_exploratory_v1.yaml")
+    assert config["status"] == "exploratory_post_gate"
+    assert config["seeds"] == [7, 123, 999]
+    assert config["canonical_tasks"] == ["bciciv2a", "high_gamma", "sleep_edf_sc"]
+    assert config["training"]["optimizer_updates_per_task"] == 2500
+    assert "cannot_override_formal_joint_gate" in config["purpose"]
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"

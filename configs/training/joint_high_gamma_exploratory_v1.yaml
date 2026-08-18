@@ -1,0 +1,39 @@
+schema_version: 1
+id: joint_high_gamma_exploratory_v1
+status: exploratory_post_gate
+method: joint_training_upper_bound
+seeds: [7, 123, 999]
+canonical_tasks: [bciciv2a, high_gamma, sleep_edf_sc]
+cache_roots:
+  bciciv2a: data/processed/v3
+  high_gamma: data/processed/high_gamma_candidate_v1
+  sleep_edf_sc: data/processed/v3
+model:
+  head: flatten_mlp
+  head_initialization: preinitialize_all_in_canonical_task_order
+  plastic_final_encoder_blocks: 4
+  frozen_backbone_mode: eval
+training:
+  train_split: train
+  evaluation_split: test
+  optimizer_updates_per_task: 2500
+  total_optimizer_updates: 7500
+  batch_size: 64
+  task_schedule: canonical_round_robin
+  task_order_within_round: [bciciv2a, high_gamma, sleep_edf_sc]
+  optimizer: AdamW
+  backbone_learning_rate: 0.0001
+  task_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing_over_all_7500_updates
+  minimum_learning_rate: 0.000001
+  progress_interval_rounds: 100
+evaluation:
+  primary: mean_subject_balanced_accuracy
+  supporting: [balanced_accuracy, accuracy, macro_f1, cohen_kappa]
+  save_predictions: true
+  checkpoint_role: exact_budget_final
+memory: {continual_state_bytes: 0}
+purpose: posthoc_seed_sensitivity_only_cannot_override_formal_joint_gate

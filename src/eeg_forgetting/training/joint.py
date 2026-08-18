@@ -47,7 +47,7 @@ def run_joint_training(
 ) -> dict[str, object]:
     config_path = Path(config_path)
     config = load_yaml(config_path)
-    if config.get("status") != "locked_main" or config.get("method") != "joint_training_upper_bound":
+    if config.get("status") not in {"locked_main", "exploratory_post_gate"} or config.get("method") != "joint_training_upper_bound":
         raise DatasetProtocolError("joint config is not locked main authority")
     canonical_tasks = tuple(config["canonical_tasks"])
     if (
