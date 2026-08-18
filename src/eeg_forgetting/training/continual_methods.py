@@ -828,7 +828,7 @@ class _TaskFisherView(nn.Module):
 def _validate_main_method_config(
     config: Mapping[str, object], *, method: str, order_name: str, seed: int
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    if config.get("status") != "locked_main" or config.get("method") != method:
+    if config.get("status") not in {"locked_main", "exploratory_post_gate"} or config.get("method") != method:
         raise DatasetProtocolError(f"expected locked main {method} config")
     tasks = tuple(config.get("canonical_tasks", ()))
     if (

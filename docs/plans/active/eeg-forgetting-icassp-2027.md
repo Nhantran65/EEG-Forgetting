@@ -406,6 +406,12 @@ Sau formal v9 fail, người dùng yêu cầu xem thêm seed. Chạy đúng ba s
 retune và không tính `delta_A`. Đây là sensitivity audit post hoc: chỉ báo pass
 rate và distribution, không được lật formal v9 decision hoặc đi vào main paper.
 
+Người dùng tiếp tục yêu cầu rerun toàn bộ replacement continual models trên cùng
+ba exploratory seeds. Chạy riêng 27 run Sequential/EWC/DER++ × 3 order × 3 seed,
+giữ nguyên mọi hyperparameter và lưu dưới exploratory config/result IDs. Chỉ báo
+performance/checkpoints; chưa chạy PED/ensemble/`delta_A`, và không nhập các run
+này vào official summaries/manuscript.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -546,6 +552,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Parameterize joint mixed-task/cache roots và train `joint_high_gamma_v1` ba seed.
 - [x] Gate sáu joint maps: strict all-six fail, bỏ joint hypothesis và không tính `delta_A`.
 - [x] Chạy exploratory joint seeds `[7,123,999]`; High-Gamma pass 3/3 nhưng không đổi formal gate.
+- [ ] Chạy 27 exploratory continual runs trên seeds `[7,123,999]`, result roots riêng; performance-only.
 - [x] Hoàn thiện hai figures và một table từ digest-bound replacement summary.
 - [x] Viết full ICASSP manuscript source với statistical reporting và limitations.
 

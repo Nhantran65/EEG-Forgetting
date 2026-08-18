@@ -218,7 +218,7 @@ def run_sequential_finetuning(
     config_path = Path(config_path)
     config = load_yaml(config_path)
     status = config["status"]
-    if status not in {"locked_smoke", "locked_main", "locked_pairwise"} or order_name not in config["orders"]:
+    if status not in {"locked_smoke", "locked_main", "locked_pairwise", "exploratory_post_gate"} or order_name not in config["orders"]:
         raise DatasetProtocolError("unknown sequential FT smoke order")
     canonical_tasks = tuple(config.get("canonical_tasks", CANONICAL_TASKS))
     if (

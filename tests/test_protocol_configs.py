@@ -255,6 +255,18 @@ def test_exploratory_joint_seeds_cannot_override_formal_gate() -> None:
     assert gate["purpose"].endswith("cannot_override_formal_joint_gate")
 
 
+def test_exploratory_continual_matrix_is_separate_and_not_official() -> None:
+    for method in ("sequential_ft", "ewc", "derpp"):
+        config = load_yaml(
+            ROOT / "configs" / "training" / f"{method}_high_gamma_exploratory_v1.yaml"
+        )
+        assert config["status"] == "exploratory_post_gate"
+        assert config["seeds"] == [7, 123, 999]
+        assert config["canonical_tasks"] == ["bciciv2a", "high_gamma", "sleep_edf_sc"]
+        assert config["training"]["optimizer_steps_per_task"] == 2500
+        assert config["purpose"].endswith("cannot_override_official_matrix")
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"
