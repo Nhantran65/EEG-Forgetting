@@ -231,6 +231,17 @@ def test_joint_high_gamma_is_budget_matched_and_uses_mixed_cache_roots() -> None
     assert config["training"]["task_order_within_round"] == config["canonical_tasks"]
 
 
+def test_joint_alignment_gate_is_strict_all_six_and_bounded() -> None:
+    config = load_yaml(ROOT / "configs" / "xai" / "joint_high_gamma_alignment_v1.yaml")
+    assert config["status"] == "locked_joint_alignment_gate"
+    assert set(config["tasks"]) == {"bciciv2a", "high_gamma"}
+    assert config["joint"]["seeds"] == [3407, 42, 2026]
+    assert config["gate"]["strict_all_six"] is True
+    assert config["alignment"]["expected_transition_cells"] == 63
+    assert config["alignment"]["minimum_wins_out_of_9"] == 8
+    assert config["xai"]["test_access"] == "forbidden"
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"

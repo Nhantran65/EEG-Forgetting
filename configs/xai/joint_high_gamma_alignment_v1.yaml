@@ -1,0 +1,60 @@
+schema_version: 1
+id: joint_high_gamma_alignment_v1
+status: locked_joint_alignment_gate
+canonical_tasks: [bciciv2a, high_gamma, sleep_edf_sc]
+joint:
+  training_config: configs/training/joint_high_gamma_v1.yaml
+  training_config_sha256: dbfd38d8ec3959f51f2c0e2baaa9cf215e60c259866699ec8adab14c590a1870
+  summary: results/joint/joint_high_gamma_v1/summary.json
+  summary_sha256: daaf04136b76ee5e37cdb3243b5e86dbb8f5ff05631d574280dfeda1a3f98bfa
+  result_root: results/joint/joint_high_gamma_v1
+  seeds: [3407, 42, 2026]
+ped_authority:
+  config: configs/xai/high_gamma_replacement_ped_v1.yaml
+  config_sha256: 90e04dd36eca803cfa4e382ca3f2aa0fe979159292d7573b099fd18857ec522c
+  summary: results/xai/high_gamma_replacement_ped_v1/summary.json
+  summary_sha256: 2005ef2c8b62207fed1215f896ce855a537ede128f39c12c2d1fe00b3027cc43
+tasks:
+  bciciv2a:
+    validation_index: data/processed/v3/bciciv2a/validation/index.json
+    validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+    validation_subjects: [A06, A07]
+    split:
+      seed: 20260815
+      fit_samples: 489
+      gate_samples: 493
+      assignment_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+    fidelity: {selected_cells: 22, random_masks: 200, random_seed: 20260821, percentile: 95}
+  high_gamma:
+    validation_index: data/processed/high_gamma_candidate_v1/high_gamma/validation/index.json
+    validation_index_sha256: 52632247aea5b55a8ef3214eb1046318cc54d703e5ac9b02bade2aa210e65fb2
+    validation_subjects: [sub-8, sub-9, sub-10, sub-11]
+    split:
+      seed: 20260818
+      fit_samples: 1966
+      gate_samples: 1968
+      assignment_sha256: 52add2ae02588b2c68ca3e4b423099e379e9cb27ba762dbf38c11b447696449b
+    fidelity: {selected_cells: 22, random_masks: 100, random_seed: 20260821, percentile: 95}
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+xai: {seed: 20260818, batch_size: 16, mask_chunk_size: 4, test_access: forbidden}
+gate:
+  minimum_median_subject_cosine: 0.70
+  subject_threshold: 0.50
+  minimum_subject_fraction_at_threshold: 0.6666666666666666
+  strict_all_six: true
+alignment:
+  expected_transition_cells: 63
+  bootstrap_replicates: 20000
+  bootstrap_seed: 20260818
+  minimum_wins_out_of_9: 8
+  require_upper_ci_below_zero: true
+output: {root: results/xai/joint_high_gamma_alignment_v1, immutable: true}
+purpose: bounded_offline_alignment_hypothesis_gate_not_default_manuscript_result
