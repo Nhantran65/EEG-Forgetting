@@ -447,6 +447,28 @@ def jensen_shannon_divergence(
     return float(0.5 * (left_terms.sum() + right_terms.sum()))
 
 
+def noise_corrected_symmetric_jsd(
+    before_fit: Sequence[float] | np.ndarray,
+    before_gate: Sequence[float] | np.ndarray,
+    after_fit: Sequence[float] | np.ndarray,
+    after_gate: Sequence[float] | np.ndarray,
+) -> dict[str, float]:
+    """Cross-checkpoint JSD minus same-checkpoint split noise, symmetrically."""
+    cross = 0.5 * (
+        jensen_shannon_divergence(before_fit, after_gate)
+        + jensen_shannon_divergence(before_gate, after_fit)
+    )
+    within = 0.5 * (
+        jensen_shannon_divergence(before_fit, before_gate)
+        + jensen_shannon_divergence(after_fit, after_gate)
+    )
+    return {
+        "cross_checkpoint_jsd": float(cross),
+        "within_checkpoint_noise_jsd": float(within),
+        "noise_corrected_ped": float(cross - within),
+    }
+
+
 def spectral_mask_integrated_gradients(
     model: nn.Module,
     task: str,

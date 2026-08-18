@@ -4,6 +4,7 @@ import csv
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 import mne
 
@@ -13,6 +14,23 @@ from ..preprocessing import patchify, preprocess_mne_raw, scale_microvolts
 
 
 CLASS_LABELS = {"left_hand": 0, "right_hand": 1, "feet": 2, "rest": 3}
+
+
+def validate_high_gamma_class_counts(
+    labels: Iterable[int],
+    *,
+    maximum_difference: int,
+    source: str | Path,
+) -> None:
+    """Require all four classes while preserving the published event rows."""
+    if maximum_difference < 0:
+        raise ValueError("maximum_difference must be non-negative")
+    counts = Counter(labels)
+    if (
+        set(counts) != set(CLASS_LABELS.values())
+        or max(counts.values()) - min(counts.values()) > maximum_difference
+    ):
+        raise DatasetProtocolError(f"{source}: unbalanced class counts {dict(counts)}")
 
 
 @dataclass(frozen=True)
@@ -48,8 +66,14 @@ def read_high_gamma_events(path: str | Path) -> tuple[HighGammaEvent, ...]:
 
 
 class HighGammaLoader:
-    def __init__(self, registry: ChannelRegistry):
+    def __init__(
+        self,
+        registry: ChannelRegistry,
+        *,
+        maximum_class_count_difference: int,
+    ):
         self.registry = registry
+        self.maximum_class_count_difference = maximum_class_count_difference
 
     def load_run(
         self,
@@ -90,7 +114,9 @@ class HighGammaLoader:
                     source_id=f"{Path(bdf_path).name}:trial-{trial_index:04d}",
                 )
             )
-        counts = Counter(sample.label for sample in samples)
-        if set(counts) != {0, 1, 2, 3} or max(counts.values()) - min(counts.values()) > 1:
-            raise DatasetProtocolError(f"{bdf_path}: unbalanced class counts {dict(counts)}")
+        validate_high_gamma_class_counts(
+            (sample.label for sample in samples),
+            maximum_difference=self.maximum_class_count_difference,
+            source=bdf_path,
+        )
         return samples

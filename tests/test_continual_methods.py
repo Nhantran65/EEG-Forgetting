@@ -63,6 +63,30 @@ def test_zero_byte_reservoir_still_tracks_stream_without_storage() -> None:
     assert reservoir.allocated_bytes == 0
 
 
+def test_replacement_reservoir_round_trips_high_gamma_registry() -> None:
+    tasks = ("bciciv2a", "high_gamma", "sleep_edf_sc")
+    probe = ByteCappedReservoir(0, seed=7, tasks=tasks)
+    reservoir = ByteCappedReservoir(
+        probe._COUNTER_BYTES + probe.slot_bytes,
+        seed=7,
+        tasks=tasks,
+    )
+    reservoir.add_batch(
+        "high_gamma",
+        torch.zeros(1, 22, 4, 200),
+        torch.tensor([2]),
+        torch.zeros(1, 4),
+    )
+    assert reservoir.inventory()["items_by_task"] == {"high_gamma": 1}
+    restored = ByteCappedReservoir(
+        reservoir.byte_cap,
+        seed=99,
+        tasks=tasks,
+    )
+    restored.load_state_dict(reservoir.state_dict())
+    assert restored.inventory() == reservoir.inventory()
+
+
 def _selection_result(method: str, candidate: float, new: float, forgetting: float):
     return {
         "method": method,

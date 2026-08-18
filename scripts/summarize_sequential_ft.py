@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "results" / "fisher" / "instrument_v1" / "summary.json",
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--stability-amendment", type=Path)
     return parser.parse_args()
 
 
@@ -69,15 +70,36 @@ def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
     config_sha = sha256_file(args.config)
+    amendment = None
+    amendment_sha = None
+    if args.stability_amendment is not None:
+        amendment = load_yaml(args.stability_amendment)
+        amendment_sha = sha256_file(args.stability_amendment)
+        if amendment.get("status") != "locked_post_gate_amendment":
+            raise DatasetProtocolError("stability amendment is not locked")
+        source = amendment["source"]
+        if (
+            Path(str(source["training_config"])).resolve() != args.config.resolve()
+            or source["training_config_sha256"] != config_sha
+        ):
+            raise DatasetProtocolError("stability amendment training config mismatch")
+        failed_summary = Path(str(source["failed_summary"]))
+        if sha256_file(failed_summary) != source["failed_summary_sha256"]:
+            raise DatasetProtocolError("stability amendment failed-summary mismatch")
     result_root = args.result_root or (
         PROJECT_ROOT / "results" / "continual" / str(config["id"])
     )
-    with args.fisher_summary.open(encoding="utf-8") as handle:
-        fisher = json.load(handle)
-    if not fisher["instrument_gate_passed"]:
-        raise DatasetProtocolError("cannot summarize CL against a failed Fisher instrument")
+    fisher = None
+    fisher_sha = None
+    if "high_gamma" not in config.get("canonical_tasks", ()):
+        with args.fisher_summary.open(encoding="utf-8") as handle:
+            fisher = json.load(handle)
+        if not fisher["instrument_gate_passed"]:
+            raise DatasetProtocolError("cannot summarize CL against a failed Fisher instrument")
+        fisher_sha = sha256_file(args.fisher_summary)
     canonical = list(config["canonical_tasks"])
     directed: dict[str, list[float]] = defaultdict(list)
+    directed_raw: dict[str, list[float]] = defaultdict(list)
     pair_values: dict[str, list[float]] = defaultdict(list)
     runs = {}
     for order_name, expected_order in config["orders"].items():
@@ -89,10 +111,11 @@ def main() -> None:
             run_id = f"{order_name}:seed-{seed}"
             runs[run_id] = sha256_file(result_path)
             for row in result["pairwise_forgetting"]:
+                direction = f"{row['old_task']}<-{row['learned_task']}"
+                directed_raw[direction].append(float(row["raw_forgetting"]))
                 if not row["relative_valid"]:
                     continue
                 value = float(row["relative_forgetting"])
-                direction = f"{row['old_task']}<-{row['learned_task']}"
                 pair = _pair_key(row["old_task"], row["learned_task"], canonical)
                 directed[direction].append(value)
                 pair_values[pair].append(value)
@@ -100,15 +123,40 @@ def main() -> None:
     directed_summary = {
         key: aggregate_replicates(values) for key, values in sorted(directed.items())
     }
+    directed_raw_summary = {
+        key: aggregate_replicates(values) for key, values in sorted(directed_raw.items())
+    }
     pair_summary = {
         key: aggregate_replicates(values) for key, values in sorted(pair_values.items())
     }
-    gate = config["analysis_gate"]
-    minimum_n = int(gate["minimum_valid_replicates_per_direction"])
-    minimum_sign = float(gate["minimum_same_sign_fraction_per_direction"])
+    gate = amendment["gate"] if amendment is not None else config["analysis_gate"]
+    minimum_n = int(
+        gate.get("minimum_replicates_per_direction", gate.get("minimum_valid_replicates_per_direction"))
+    )
+    minimum_sign = float(
+        gate.get(
+            "minimum_same_sign_fraction_per_direction",
+            config["analysis_gate"]["minimum_same_sign_fraction_per_direction"],
+        )
+    )
+    fallback_directions = (
+        set(amendment["fallback"]["directions"]) if amendment is not None else set()
+    )
+    gate_summaries = {
+        direction: (
+            directed_raw_summary[direction]
+            if direction in fallback_directions
+            else directed_summary[direction]
+        )
+        for direction in directed_raw_summary
+    }
+    gate_metrics = {
+        direction: "raw_forgetting" if direction in fallback_directions else "relative_forgetting"
+        for direction in gate_summaries
+    }
     signal_directions = 0
     sign_consistent_directions = 0
-    for values in directed_summary.values():
+    for values in gate_summaries.values():
         if int(values["n"]) < minimum_n:
             continue
         sd = float(values["sample_sd"])
@@ -118,44 +166,65 @@ def main() -> None:
         if same_sign >= minimum_sign:
             sign_consistent_directions += 1
     required_directions = int(gate["minimum_signal_directions"])
-    enough_replicates = len(directed_summary) == 6 and all(
-        int(values["n"]) >= minimum_n for values in directed_summary.values()
+    required_sign_directions = int(
+        gate.get("minimum_sign_consistent_directions", required_directions)
+    )
+    enough_replicates = len(gate_summaries) == 6 and all(
+        int(values["n"]) >= minimum_n for values in gate_summaries.values()
     )
     stability_gate_passed = (
         enough_replicates
         and signal_directions >= required_directions
-        and sign_consistent_directions >= required_directions
+        and sign_consistent_directions >= required_sign_directions
     )
-    overlap = fisher["cross_task_cosine"]
     shared_pairs = sorted(pair_summary)
-    rho, pvalue = spearmanr(
-        [float(overlap[pair]) for pair in shared_pairs],
-        [float(pair_summary[pair]["mean"]) for pair in shared_pairs],
-    )
-    summary = {
-        "schema_version": 1,
-        "run": config["id"],
-        "config_sha256": config_sha,
-        "fisher_summary_sha256": sha256_file(args.fisher_summary),
-        "input_result_sha256": runs,
-        "directed_relative_forgetting": directed_summary,
-        "pair_relative_forgetting": pair_summary,
-        "pair_fisher_overlap": {pair: overlap[pair] for pair in shared_pairs},
-        "exploratory_pair_spearman": {
+    if fisher is None:
+        pair_fisher_overlap = None
+        exploratory_pair_spearman = {
+            "status": "omitted_for_replacement_matrix",
+            "reason": "no_predeclared_high_gamma_fisher_instrument",
+        }
+    else:
+        overlap = fisher["cross_task_cosine"]
+        pair_fisher_overlap = {pair: overlap[pair] for pair in shared_pairs}
+        rho, pvalue = spearmanr(
+            [float(overlap[pair]) for pair in shared_pairs],
+            [float(pair_summary[pair]["mean"]) for pair in shared_pairs],
+        )
+        exploratory_pair_spearman = {
             "n_pairs": len(shared_pairs),
             "rho": float(rho),
             "pvalue": float(pvalue),
             "warning": "three_pairs_only_do_not_treat_as_confirmatory_inference",
-        },
+        }
+    summary = {
+        "schema_version": 1,
+        "run": config["id"],
+        "config_sha256": config_sha,
+        "stability_amendment_sha256": amendment_sha,
+        "fisher_summary_sha256": fisher_sha,
+        "input_result_sha256": runs,
+        "directed_relative_forgetting": directed_summary,
+        "directed_raw_forgetting": directed_raw_summary,
+        "stability_gate_metric_by_direction": gate_metrics,
+        "stability_gate_selected_summary": gate_summaries,
+        "pair_relative_forgetting": pair_summary,
+        "pair_fisher_overlap": pair_fisher_overlap,
+        "exploratory_pair_spearman": exploratory_pair_spearman,
         "gate": {
             "enough_replicates": enough_replicates,
             "signal_directions": signal_directions,
             "sign_consistent_directions": sign_consistent_directions,
             "required_directions": required_directions,
+            "required_sign_consistent_directions": required_sign_directions,
             "passed": stability_gate_passed,
         },
     }
-    output = args.output or result_root / "summary.json"
+    output = args.output or (
+        Path(str(amendment["output"]))
+        if amendment is not None
+        else result_root / "summary.json"
+    )
     if output.exists():
         raise DatasetProtocolError(f"refusing to overwrite sequential summary {output}")
     temporary = output.with_suffix(output.suffix + ".tmp")

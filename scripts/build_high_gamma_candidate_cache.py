@@ -54,7 +54,10 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "data" / "processed" / "high_gamma_candidate_v1",
     )
     parser.add_argument(
-        "--splits", nargs="+", choices=("train", "validation"), default=("train", "validation")
+        "--splits",
+        nargs="+",
+        choices=("train", "validation", "test"),
+        default=("train", "validation"),
     )
     parser.add_argument("--verify-source-checksums", action="store_true")
     return parser.parse_args()
@@ -90,7 +93,12 @@ def main() -> None:
     with manifest_path.open(encoding="utf-8") as handle:
         source_manifest = {row["path"]: row for row in json.load(handle)}
     registry = ChannelRegistry.from_yaml(PROJECT_ROOT / "configs" / "channels.yaml")
-    loader = HighGammaLoader(registry)
+    loader = HighGammaLoader(
+        registry,
+        maximum_class_count_difference=int(
+            config["assertions"]["maximum_class_count_difference"]
+        ),
+    )
     summaries = []
     for split in args.splits:
         units = _units(config, args.raw_root, split)

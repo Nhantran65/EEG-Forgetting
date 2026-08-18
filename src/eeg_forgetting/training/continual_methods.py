@@ -43,7 +43,6 @@ from .pilot import (
 
 
 PAIR_TASKS = ("bciciv2a", "sleep_edf_sc")
-_TASK_TO_INDEX = {task: index for index, task in enumerate(CANONICAL_TASKS)}
 
 
 def ewc_quadratic_penalty(
@@ -78,14 +77,32 @@ class ByteCappedReservoir:
 
     _COUNTER_BYTES = 16  # signed 64-bit ``size`` and ``seen`` counters
 
-    def __init__(self, byte_cap: int, *, seed: int):
+    def __init__(
+        self,
+        byte_cap: int,
+        *,
+        seed: int,
+        tasks: Sequence[str] = CANONICAL_TASKS,
+    ):
         if byte_cap < 0:
             raise DatasetProtocolError("replay byte cap cannot be negative")
+        self.task_names = tuple(tasks)
+        if (
+            not self.task_names
+            or len(set(self.task_names)) != len(self.task_names)
+            or not set(self.task_names).issubset(TASK_CLASSES)
+            or len(self.task_names) > torch.iinfo(torch.int8).max
+        ):
+            raise DatasetProtocolError("replay buffer needs distinct declared tasks")
+        self._task_to_index = {
+            task: index for index, task in enumerate(self.task_names)
+        }
         self.byte_cap = int(byte_cap)
         self.max_signal_values = max(
-            channels * patches * 200 for channels, patches in TASK_SHAPES.values()
+            TASK_SHAPES[task][0] * TASK_SHAPES[task][1] * 200
+            for task in self.task_names
         )
-        self.max_classes = max(TASK_CLASSES.values())
+        self.max_classes = max(TASK_CLASSES[task] for task in self.task_names)
         self.slot_bytes = (
             self.max_signal_values * torch.tensor([], dtype=torch.float32).element_size()
             + self.max_classes * torch.tensor([], dtype=torch.float32).element_size()
@@ -121,7 +138,7 @@ class ByteCappedReservoir:
         label: Tensor | int,
         logits: Tensor,
     ) -> None:
-        if task not in _TASK_TO_INDEX:
+        if task not in self._task_to_index:
             raise DatasetProtocolError(f"cannot replay unknown task {task!r}")
         expected_values = int(np.prod((*TASK_SHAPES[task], 200)))
         flat_signal = signal.detach().float().cpu().reshape(-1)
@@ -135,7 +152,7 @@ class ByteCappedReservoir:
         self.signals[slot, :expected_values].copy_(flat_signal)
         self.logits[slot, : TASK_CLASSES[task]].copy_(flat_logits)
         self.labels[slot] = int(label)
-        self.tasks[slot] = _TASK_TO_INDEX[task]
+        self.tasks[slot] = self._task_to_index[task]
 
     def add_batch(
         self, task: str, signals: Tensor, labels: Tensor, logits: Tensor
@@ -166,7 +183,7 @@ class ByteCappedReservoir:
         indices = self._generator.choice(self.size, size=count, replace=False)
         grouped: dict[str, list[int]] = {}
         for index in indices:
-            task = CANONICAL_TASKS[int(self.tasks[int(index)])]
+            task = self.task_names[int(self.tasks[int(index)])]
             grouped.setdefault(task, []).append(int(index))
         batches: dict[str, dict[str, Tensor]] = {}
         for task, slots in grouped.items():
@@ -184,7 +201,7 @@ class ByteCappedReservoir:
 
     def inventory(self) -> dict[str, object]:
         counts = Counter(
-            CANONICAL_TASKS[int(value)] for value in self.tasks[: self.size].tolist()
+            self.task_names[int(value)] for value in self.tasks[: self.size].tolist()
         )
         duration_seconds = sum(
             count * TASK_SHAPES[task][1] for task, count in counts.items()
@@ -204,6 +221,7 @@ class ByteCappedReservoir:
     def state_dict(self) -> dict[str, object]:
         return {
             "byte_cap": self.byte_cap,
+            "task_names": self.task_names,
             "signals": self.signals,
             "logits": self.logits,
             "labels": self.labels,
@@ -216,6 +234,9 @@ class ByteCappedReservoir:
     def load_state_dict(self, state: Mapping[str, object]) -> None:
         if int(state["byte_cap"]) != self.byte_cap:
             raise DatasetProtocolError("replay checkpoint byte cap mismatch")
+        stored_tasks = tuple(state.get("task_names", CANONICAL_TASKS))
+        if stored_tasks != self.task_names:
+            raise DatasetProtocolError("replay checkpoint task registry mismatch")
         for name in ("signals", "logits", "labels", "tasks"):
             source = state[name]
             target = getattr(self, name)
@@ -806,15 +827,20 @@ class _TaskFisherView(nn.Module):
 
 def _validate_main_method_config(
     config: Mapping[str, object], *, method: str, order_name: str, seed: int
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     if config.get("status") != "locked_main" or config.get("method") != method:
         raise DatasetProtocolError(f"expected locked main {method} config")
-    if tuple(config.get("canonical_tasks", ())) != CANONICAL_TASKS:
-        raise DatasetProtocolError("main method config changed the canonical tasks")
+    tasks = tuple(config.get("canonical_tasks", ()))
+    if (
+        not tasks
+        or len(set(tasks)) != len(tasks)
+        or not set(tasks).issubset(TASK_CLASSES)
+    ):
+        raise DatasetProtocolError("main method config has invalid canonical tasks")
     if order_name not in config["orders"]:
         raise DatasetProtocolError(f"unknown {method} order {order_name!r}")
     order = tuple(config["orders"][order_name])
-    if set(order) != set(CANONICAL_TASKS) or len(order) != len(CANONICAL_TASKS):
+    if set(order) != set(tasks) or len(order) != len(tasks):
         raise DatasetProtocolError("main method order must contain every task once")
     if int(seed) not in tuple(int(value) for value in config["seeds"]):
         raise DatasetProtocolError(f"seed {seed} is not declared by {method} config")
@@ -836,23 +862,48 @@ def _validate_main_method_config(
     )
     if float(selected) != float(declared):
         raise DatasetProtocolError("main method setting differs from pilot selection")
-    return order
+    return tasks, order
+
+
+def _task_cache_roots(
+    config: Mapping[str, object],
+    config_path: Path,
+    cache_root: Path,
+    tasks: Sequence[str],
+) -> dict[str, Path]:
+    configured = config.get("cache_roots")
+    if configured is None:
+        return {task: cache_root for task in tasks}
+    if set(configured) != set(tasks):
+        raise DatasetProtocolError("main method cache roots must cover every task")
+    project_root = config_path.resolve().parents[2]
+    return {
+        task: (
+            Path(str(value)).resolve()
+            if Path(str(value)).is_absolute()
+            else (project_root / str(value)).resolve()
+        )
+        for task, value in configured.items()
+    }
 
 
 def _load_main_data(
-    cache_root: Path, *, batch_size: int
+    cache_roots: Mapping[str, Path],
+    *,
+    tasks: Sequence[str],
+    batch_size: int,
 ) -> tuple[
     dict[str, CachedEEGDataset],
     dict[str, CachedEEGDataset],
     dict[str, DataLoader],
 ]:
     train_sets = {
-        task: CachedEEGDataset(cache_root / task / "train" / "index.json")
-        for task in CANONICAL_TASKS
+        task: CachedEEGDataset(cache_roots[task] / task / "train" / "index.json")
+        for task in tasks
     }
     test_sets = {
-        task: CachedEEGDataset(cache_root / task / "test" / "index.json")
-        for task in CANONICAL_TASKS
+        task: CachedEEGDataset(cache_roots[task] / task / "test" / "index.json")
+        for task in tasks
     }
     test_loaders = {
         task: DataLoader(
@@ -1041,7 +1092,8 @@ def _extract_ewc_state(
     device: torch.device,
 ) -> dict[str, object]:
     settings = config["ewc"]
-    canonical_index = CANONICAL_TASKS.index(task) + 1
+    canonical_tasks = tuple(config["canonical_tasks"])
+    canonical_index = canonical_tasks.index(task) + 1
     sampling_seed = int(seed) + 100003 * canonical_index
     indices = deterministic_sample_indices(
         len(dataset),
@@ -1155,7 +1207,7 @@ def run_ewc_continual_matrix_run(
 ) -> dict[str, object]:
     config_path = Path(config_path)
     config = load_yaml(config_path)
-    order = _validate_main_method_config(
+    tasks, order = _validate_main_method_config(
         config, method="ewc", order_name=order_name, seed=seed
     )
     output_dir = Path(output_dir)
@@ -1166,12 +1218,14 @@ def run_ewc_continual_matrix_run(
     torch.cuda.set_device(device)
     cache_root = Path(cache_root)
     train_sets, test_sets, test_loaders = _load_main_data(
-        cache_root, batch_size=int(config["training"]["batch_size"])
+        _task_cache_roots(config, config_path, cache_root, tasks),
+        tasks=tasks,
+        batch_size=int(config["training"]["batch_size"]),
     )
     backbone = load_pretrained_backbone(
         checkpoint_path, expected_sha256=checkpoint_sha256, map_location="cpu"
     )
-    model = MultiHeadCBraMod(backbone).to(device)
+    model = MultiHeadCBraMod(backbone, tasks=tasks).to(device)
     config_sha = sha256_file(config_path)
     completed_stages, latest_checkpoint = _resume_main_stages(
         output_dir=output_dir, order=order, config_sha=config_sha
@@ -1312,7 +1366,7 @@ def run_derpp_continual_matrix_run(
 ) -> dict[str, object]:
     config_path = Path(config_path)
     config = load_yaml(config_path)
-    order = _validate_main_method_config(
+    tasks, order = _validate_main_method_config(
         config, method="derpp", order_name=order_name, seed=seed
     )
     output_dir = Path(output_dir)
@@ -1323,15 +1377,19 @@ def run_derpp_continual_matrix_run(
     torch.cuda.set_device(device)
     cache_root = Path(cache_root)
     train_sets, test_sets, test_loaders = _load_main_data(
-        cache_root, batch_size=int(config["training"]["batch_size"])
+        _task_cache_roots(config, config_path, cache_root, tasks),
+        tasks=tasks,
+        batch_size=int(config["training"]["batch_size"]),
     )
     backbone = load_pretrained_backbone(
         checkpoint_path, expected_sha256=checkpoint_sha256, map_location="cpu"
     )
-    model = MultiHeadCBraMod(backbone).to(device)
+    model = MultiHeadCBraMod(backbone, tasks=tasks).to(device)
     method = config["derpp"]
     buffer = ByteCappedReservoir(
-        int(method["persistent_byte_cap"]), seed=int(seed) + 9173
+        int(method["persistent_byte_cap"]),
+        seed=int(seed) + 9173,
+        tasks=tasks,
     )
     config_sha = sha256_file(config_path)
     completed_stages, latest_checkpoint = _resume_main_stages(

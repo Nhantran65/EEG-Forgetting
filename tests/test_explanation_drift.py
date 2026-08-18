@@ -9,6 +9,7 @@ from eeg_forgetting.xai.explanation_drift import (
     frozen_stratified_capped_halves,
     frozen_stratified_halves,
     jensen_shannon_divergence,
+    noise_corrected_symmetric_jsd,
     reliance_maps,
     ridge_mask_coefficients,
     score_spectral_masks,
@@ -82,6 +83,18 @@ def test_jsd_is_zero_for_equal_and_one_for_disjoint_positive_maps() -> None:
     assert jensen_shannon_divergence([1, 0], [0, 1]) == pytest.approx(1.0)
     with pytest.raises(DatasetProtocolError, match="positive mass"):
         jensen_shannon_divergence([0, -1], [1, 0])
+
+
+def test_noise_corrected_symmetric_jsd_subtracts_split_noise() -> None:
+    stable = noise_corrected_symmetric_jsd(
+        [4, 1], [3, 1], [4, 1], [3, 1]
+    )
+    assert stable["noise_corrected_ped"] == pytest.approx(0.0)
+    changed = noise_corrected_symmetric_jsd(
+        [4, 1], [3, 1], [1, 4], [1, 3]
+    )
+    assert changed["cross_checkpoint_jsd"] > changed["within_checkpoint_noise_jsd"]
+    assert changed["noise_corrected_ped"] > 0
 
 
 class _BandEnergyModel(nn.Module):

@@ -1,0 +1,22 @@
+schema_version: 1
+id: high_gamma_sequential_stability_v2
+status: locked_post_gate_amendment
+approved_date: 2026-08-18
+source:
+  training_config: configs/training/sequential_ft_high_gamma_v1.yaml
+  training_config_sha256: 1be187a08bd3de8afeadda5b5ab74f272703c9b6a79898032aeb53ca32b8fded
+  failed_summary: results/continual/sequential_ft_high_gamma_v1/summary.json
+  failed_summary_sha256: 38b66f472ac914bca1d7a8016c38ed6752cf4ebd8f7c5f21e5d7ddbf36abf8f2
+fallback:
+  trigger: directed_transition_has_fewer_than_three_valid_relative_replicates_due_to_near_chance
+  directions: [sleep_edf_sc<-bciciv2a]
+  metric: raw_forgetting_for_all_replicates_in_direction
+  preserve_invalid_relative_as_null: true
+gate:
+  minimum_replicates_per_direction: 3
+  signal_definition: absolute_mean_exceeds_sample_sd_within_selected_metric
+  minimum_signal_directions: 4
+  minimum_same_sign_fraction_per_direction: 0.6666666666666666
+  minimum_sign_consistent_directions: 4
+output: results/continual/sequential_ft_high_gamma_v1/summary-v2.json
+purpose: explicit_near_chance_raw_fallback_without_threshold_change

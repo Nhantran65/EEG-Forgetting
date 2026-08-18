@@ -23,7 +23,8 @@ assertions:
   classes_per_subject: 4
   minimum_trials_per_subject: 400
   duration_seconds: 4.0
-  balanced_classes_within_one_trial: true
+  maximum_class_count_difference: 2
+  class_balance_policy: preserve_all_published_events
 source_pin:
   manifest: data/raw/high_gamma/nm000172-v1.0.2/manifest.json
   manifest_sha256: 095d69f36b0818eb0df761065edb3fc4c51a4576ca16e0a030a2b0b1e4a2621f

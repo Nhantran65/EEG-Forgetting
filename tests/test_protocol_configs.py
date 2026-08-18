@@ -215,8 +215,96 @@ def test_high_gamma_replacement_candidate_is_locked_before_download() -> None:
         "test": [12, 13, 14],
     }
     assert dataset["channel_montage"] == "bciciv2a_22"
+    assert dataset["assertions"]["maximum_class_count_difference"] == 2
+    assert dataset["assertions"]["class_balance_policy"] == "preserve_all_published_events"
     assert pilot["training"]["optimizer_steps"] == 2500
     assert pilot["test_access"] == "forbidden"
+
+
+def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"
+    )
+    assert config["status"] == "locked_xai_reliability_pilot"
+    assert config["checkpoint"]["format"] == "single_task_state_dict"
+    assert config["checkpoint"]["expected_step"] == 2500
+    assert config["cache"]["test_access"] == "forbidden"
+    assert config["cache"]["forbidden_test_subjects"] == [
+        "sub-12",
+        "sub-13",
+        "sub-14",
+    ]
+    assert config["attribution_split"] == {
+        "method": "sha256_rank_within_subject_class_v1",
+        "seed": 20260818,
+        "attribution_fit_samples": 1966,
+        "attribution_gate_samples": 1968,
+        "assignment_sha256": "52add2ae02588b2c68ca3e4b423099e379e9cb27ba762dbf38c11b447696449b",
+        "aggregation": "mean_within_class_then_equal_classes_then_equal_subjects",
+    }
+    assert config["fidelity"] == {
+        "run_only_if_reliability_passes": True,
+        "selected_cells": 22,
+        "random_masks": 100,
+        "random_seed": 20260821,
+        "percentile": 95,
+        "require_margin_and_ba": True,
+    }
+
+
+def test_high_gamma_replacement_matrix_keeps_methods_and_budget_locked() -> None:
+    expected_tasks = ["bciciv2a", "high_gamma", "sleep_edf_sc"]
+    expected_orders = {
+        "forward": ["bciciv2a", "high_gamma", "sleep_edf_sc"],
+        "reverse": ["sleep_edf_sc", "high_gamma", "bciciv2a"],
+        "challenging": ["high_gamma", "bciciv2a", "sleep_edf_sc"],
+    }
+    for name, method in (
+        ("sequential_ft_high_gamma_v1.yaml", "sequential_finetuning"),
+        ("ewc_high_gamma_v1.yaml", "ewc"),
+        ("derpp_high_gamma_v1.yaml", "derpp"),
+    ):
+        config = load_yaml(ROOT / "configs" / "training" / name)
+        assert config["status"] == "locked_main"
+        assert config["method"] == method
+        assert config["canonical_tasks"] == expected_tasks
+        assert config["orders"] == expected_orders
+        assert config["seeds"] == [3407, 42, 2026]
+        assert config["training"]["optimizer_steps_per_task"] == 2500
+        assert config["training"]["evaluation_split"] == "test"
+        assert set(config["cache_roots"]) == set(expected_tasks)
+    ewc = load_yaml(ROOT / "configs" / "training" / "ewc_high_gamma_v1.yaml")
+    derpp = load_yaml(ROOT / "configs" / "training" / "derpp_high_gamma_v1.yaml")
+    assert ewc["ewc"]["strength"] == 100000
+    assert derpp["derpp"]["persistent_byte_cap"] == 8388608
+
+
+def test_high_gamma_near_chance_amendment_does_not_lower_threshold() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "analysis" / "high_gamma_sequential_stability_v2.yaml"
+    )
+    assert config["status"] == "locked_post_gate_amendment"
+    assert config["fallback"]["directions"] == ["sleep_edf_sc<-bciciv2a"]
+    assert config["fallback"]["metric"] == "raw_forgetting_for_all_replicates_in_direction"
+    assert config["fallback"]["preserve_invalid_relative_as_null"] is True
+    assert config["gate"]["minimum_replicates_per_direction"] == 3
+    assert config["gate"]["minimum_signal_directions"] == 4
+
+
+def test_replacement_ped_scale_excludes_sleep_and_locks_noise_correction() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "high_gamma_replacement_ped_v1.yaml"
+    )
+    assert config["status"] == "locked_xai_scale"
+    assert config["scale"]["old_tasks"] == ["bciciv2a", "high_gamma"]
+    assert config["scale"]["excluded_old_tasks"] == ["sleep_edf_sc"]
+    assert config["scale"]["expected_run_cells"] == 27
+    assert config["scale"]["expected_transition_cells"] == 63
+    assert config["estimator"]["drift"] == (
+        "symmetric_cross_checkpoint_jsd_minus_within_checkpoint_split_noise"
+    )
+    assert config["estimator"]["clip_negative_ped"] is False
+    assert config["scale"]["test_access_for_xai"] == "forbidden"
 
 
 def test_converged_single_task_early_stopping_is_locked() -> None:

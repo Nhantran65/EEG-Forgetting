@@ -49,8 +49,10 @@ def aggregate_replicates(values: Sequence[float]) -> dict[str, float | int]:
 class MultiHeadCBraMod(nn.Module):
     def __init__(self, backbone: CBraMod, *, tasks: Sequence[str] = CANONICAL_TASKS):
         super().__init__()
-        if tuple(tasks) != CANONICAL_TASKS:
-            raise DatasetProtocolError("task heads must be initialized in canonical order")
+        tasks = tuple(tasks)
+        if not tasks or len(set(tasks)) != len(tasks) or not set(tasks).issubset(TASK_CLASSES):
+            raise DatasetProtocolError("task heads need distinct declared tasks")
+        self.tasks = tasks
         self.backbone = backbone
         self.heads = nn.ModuleDict()
         for task in tasks:
@@ -218,13 +220,20 @@ def run_sequential_finetuning(
     status = config["status"]
     if status not in {"locked_smoke", "locked_main", "locked_pairwise"} or order_name not in config["orders"]:
         raise DatasetProtocolError("unknown sequential FT smoke order")
+    canonical_tasks = tuple(config.get("canonical_tasks", CANONICAL_TASKS))
+    if (
+        not canonical_tasks
+        or len(set(canonical_tasks)) != len(canonical_tasks)
+        or not set(canonical_tasks).issubset(TASK_CLASSES)
+    ):
+        raise DatasetProtocolError("sequential config has invalid canonical tasks")
     order = tuple(config["orders"][order_name])
     if status == "locked_pairwise":
-        if len(order) != 2 or len(set(order)) != 2 or not set(order).issubset(CANONICAL_TASKS):
+        if len(order) != 2 or len(set(order)) != 2 or not set(order).issubset(canonical_tasks):
             raise DatasetProtocolError(
                 "pairwise sequential order must contain two distinct locked tasks"
             )
-    elif set(order) != set(CANONICAL_TASKS):
+    elif set(order) != set(canonical_tasks) or len(order) != len(canonical_tasks):
         raise DatasetProtocolError("sequential FT order must contain every locked task once")
     output_dir = Path(output_dir)
     result_path = output_dir / "result.json"
@@ -242,10 +251,10 @@ def run_sequential_finetuning(
     cache_root = Path(cache_root)
     configured_roots = config.get("cache_roots")
     if configured_roots is None:
-        task_cache_roots = {task: cache_root for task in CANONICAL_TASKS}
+        task_cache_roots = {task: cache_root for task in canonical_tasks}
     else:
         project_root = config_path.resolve().parents[2]
-        if set(configured_roots) != set(CANONICAL_TASKS):
+        if set(configured_roots) != set(canonical_tasks):
             raise DatasetProtocolError("configured cache roots must cover every locked task")
         task_cache_roots = {
             task: (
@@ -257,11 +266,11 @@ def run_sequential_finetuning(
         }
     train_sets = {
         task: CachedEEGDataset(task_cache_roots[task] / task / "train" / "index.json")
-        for task in CANONICAL_TASKS
+        for task in canonical_tasks
     }
     test_sets = {
         task: CachedEEGDataset(task_cache_roots[task] / task / "test" / "index.json")
-        for task in CANONICAL_TASKS
+        for task in canonical_tasks
     }
     test_loaders = {
         task: DataLoader(
@@ -278,7 +287,7 @@ def run_sequential_finetuning(
         expected_sha256=checkpoint_sha256,
         map_location="cpu",
     )
-    model = MultiHeadCBraMod(backbone).to(device)
+    model = MultiHeadCBraMod(backbone, tasks=canonical_tasks).to(device)
     config_sha = sha256_file(config_path)
     completed_stages = []
     resume_index = 0

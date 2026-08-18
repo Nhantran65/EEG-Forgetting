@@ -1,0 +1,70 @@
+schema_version: 1
+id: derpp_high_gamma_v1
+status: locked_main
+method: derpp
+manifest_version: mixed_v3_high_gamma_candidate_v1
+seeds: [3407, 42, 2026]
+canonical_tasks: [bciciv2a, high_gamma, sleep_edf_sc]
+orders:
+  forward: [bciciv2a, high_gamma, sleep_edf_sc]
+  reverse: [sleep_edf_sc, high_gamma, bciciv2a]
+  challenging: [high_gamma, bciciv2a, sleep_edf_sc]
+cache_roots:
+  bciciv2a: data/processed/v3
+  high_gamma: data/processed/high_gamma_candidate_v1
+  sleep_edf_sc: data/processed/v3
+model:
+  head: flatten_mlp
+  head_initialization: preinitialize_all_in_canonical_task_order
+  plastic_final_encoder_blocks: 4
+  frozen_backbone_mode: eval
+training:
+  train_split: train
+  evaluation_split: test
+  optimizer_steps_per_task: 2500
+  batch_size: 64
+  optimizer: AdamW
+  optimizer_reset_each_task: true
+  backbone_learning_rate: 0.0001
+  current_head_learning_rate: 0.0005
+  weight_decay: 0.05
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.1
+  schedule: cosine_annealing
+  minimum_learning_rate: 0.000001
+  progress_interval_steps: 100
+derpp:
+  alpha: 0.5
+  beta: 0.5
+  replay_batch_size: 64
+  persistent_byte_cap: 8388608
+  selected_byte_cap_mib: 8
+  reservoir_policy: algorithm_r_uniform_over_training_draw_stream
+  storage: fixed_slots_padded_to_largest_locked_task
+  account_fields: [float32_signal, int64_label, float32_logits, int8_task_id, int64_size, int64_seen]
+  two_independent_replay_draws: true
+  replay_within_current_task: true
+derivation:
+  pilot_config: configs/pilots/continual_method_selection_v1.yaml
+  pilot_summary: results/pilots/continual_method_selection_v1/summary.json
+  pilot_summary_sha256: 0120ba014a7c85620b897e9bbbf5c684abf308fe2742bd9daa4d5a2e9b6eea95
+  selected_candidate_mib: 8
+evaluation:
+  primary: mean_subject_balanced_accuracy
+  supporting: [balanced_accuracy, accuracy, macro_f1, cohen_kappa]
+  save_predictions: true
+  evaluate_seen_tasks_after_each_stage: true
+forgetting:
+  raw: before_minus_after
+  relative: raw_divided_by_before_minus_chance
+  minimum_valid_headroom_above_chance: 0.05
+  invalid_action: retain_raw_and_flag_relative_null_without_clipping
+analysis_gate:
+  minimum_valid_replicates_per_direction: 3
+  signal_definition: absolute_mean_relative_forgetting_exceeds_sample_sd
+  minimum_signal_directions: 4
+  minimum_same_sign_fraction_per_direction: 0.6666666666666666
+recovery:
+  checkpoint_after_each_task: true
+  resume_only_from_digest_verified_complete_stage: true
+purpose: high_gamma_replacement_main_derpp_matrix_without_retuning

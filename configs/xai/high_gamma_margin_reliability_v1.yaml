@@ -1,0 +1,56 @@
+schema_version: 1
+id: high_gamma_margin_reliability_v1
+status: locked_xai_reliability_pilot
+task: high_gamma
+seed: 42
+checkpoint:
+  format: single_task_state_dict
+  role: exact_budget_high_gamma_single_task
+  path: results/pilots/high_gamma_candidate_v1/seed-42/final.pt
+  sha256: 196169359dcc71694c0d7644fec7f1aa111f48d5114e31b77748fb0be632a52c
+  result: results/pilots/high_gamma_candidate_v1/seed-42/result.json
+  result_sha256: bb0d0458edb536f9fa704584977d9ae536fe8285a6065efa099023ceadd799df
+  parent_config: configs/pilots/high_gamma_candidate_v1.yaml
+  parent_config_sha256: c78a1b9fd21ebfc51d923a899f114e2a5138e9944334eca79b436b3a9b8a0dcd
+  expected_pilot: high_gamma_candidate_v1
+  expected_step: 2500
+  expected_task: high_gamma
+  head: flatten_mlp
+cache:
+  validation_index: data/processed/high_gamma_candidate_v1/high_gamma/validation/index.json
+  validation_index_sha256: 52632247aea5b55a8ef3214eb1046318cc54d703e5ac9b02bade2aa210e65fb2
+  validation_samples: 3934
+  validation_subjects: [sub-8, sub-9, sub-10, sub-11]
+  forbidden_test_subjects: [sub-12, sub-13, sub-14]
+  test_access: forbidden
+attribution_split:
+  method: sha256_rank_within_subject_class_v1
+  seed: 20260818
+  attribution_fit_samples: 1966
+  attribution_gate_samples: 1968
+  assignment_sha256: 52add2ae02588b2c68ca3e4b423099e379e9cb27ba762dbf38c11b447696449b
+  aggregation: mean_within_class_then_equal_classes_then_equal_subjects
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+evaluation: {batch_size: 16, mask_chunk_size: 4}
+gate:
+  all_subject_cosines_finite: true
+  minimum_median_subject_cosine: 0.70
+  subject_threshold: 0.50
+  minimum_subject_fraction_at_threshold: 0.6666666666666666
+fidelity:
+  run_only_if_reliability_passes: true
+  selected_cells: 22
+  random_masks: 100
+  random_seed: 20260821
+  percentile: 95
+  require_margin_and_ba: true
+output: {root: results/xai/high_gamma_margin_reliability_v1, immutable: true}
+purpose: final_replacement_candidate_reliability_and_fidelity_gate

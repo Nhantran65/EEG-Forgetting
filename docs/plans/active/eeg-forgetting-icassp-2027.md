@@ -304,6 +304,74 @@ và chưa rerun CL. Candidate được chọn trước khi nhìn XAI vì đạt 
 High-Gamma có motor execution/rest signal mạnh và có thể chứa movement/EMG
 confound; mọi claim sau này phải gọi đúng motor-task dataset, không tự gọi pure MI.
 
+### High-Gamma attribution gate v5 — 2026-08-18
+
+Khóa trước khi chạy XAI trên checkpoint final step 2.500 seed 42. Dùng toàn bộ
+3.934 validation row của subject 8–11, chia `sha256_rank_within_subject_class_v1`
+với seed `20260818` thành 1.966 fit và 1.968 gate row; không cap vì số trial/subject
+là lý do độc lập để chọn candidate. Assignment SHA-256 là
+`52add2ae02588b2c68ca3e4b423099e379e9cb27ba762dbf38c11b447696449b`.
+
+- Reliability dùng single-cell classification-margin drop, mean trong từng class
+  rồi equal-average giữa class. Gate giữ nguyên: mọi cosine finite, median subject
+  `>=0,70`, và ít nhất 2/3 subject `>=0,50` (với 4 subject nghĩa là ít nhất 3/4).
+- Chỉ nếu reliability pass, fidelity chọn top `22/110` cell từ fit map và đánh giá
+  trên gate half, so với 100 unique random mask cùng 22 cell, seed `20260821`.
+- Fidelity pass khi cả subject-balanced BA drop và class-balanced margin drop của
+  top mask đều lớn hơn percentile 95 của random controls.
+- Chỉ khi reliability và fidelity cùng pass mới cho phép thay PhysioNet và thiết
+  kế lại main CL matrix. Test subject 12–14 vẫn cấm đọc trong cả hai gate.
+
+### High-Gamma replacement matrix v6 — 2026-08-18
+
+Vì v5 pass, main replacement matrix được khóa trước khi train CL:
+
+- canonical tasks: `BCI IV-2a`, `High-Gamma`, `Sleep-EDF`; PhysioNet artifacts cũ
+  giữ immutable nhưng không thuộc replacement matrix;
+- orders: forward `BCI→High-Gamma→Sleep`, reverse
+  `Sleep→High-Gamma→BCI`, challenging `High-Gamma→BCI→Sleep`;
+- seeds `3407/42/2026`; final-4 blocks, 2.500 step/task, optimizer/schedule và
+  Sequential FT/EWC `lambda=100.000`/DER++ `8 MiB` giữ nguyên, không retune;
+- chạy đủ Sequential trước; chỉ mở EWC/DER++ sau khi cả 9 Sequential run hợp lệ;
+- evaluation dùng frozen test cache. High-Gamma test 12–14 chỉ được materialize
+  sau khi v5 result đã immutable; không dùng test để đổi gate/hyperparameter;
+- mọi run dùng config/result/checkpoint/prediction digest và resumable stage như
+  matrix cũ. PED chỉ scale sau khi performance matrix và checkpoint inventory pass.
+
+### Near-chance stability amendment v7 — 2026-08-18
+
+Người dùng phê duyệt sau khi v6 hard gate fail vì đúng một `Sleep←BCI` replicate
+có headroom `0,0482 < 0,05`. Không hạ threshold và không tạo `F_rel` giả. Quy tắc
+v7 tạo summary mới, không overwrite v6:
+
+- report table vẫn giữ `F_rel=null` cho replicate invalid và báo raw F;
+- riêng stability gate, nếu một directed transition thiếu replicate vì near-chance,
+  dùng raw F cho **toàn bộ replicate của direction đó**, không trộn raw và relative;
+- fallback khóa duy nhất cho `sleep_edf_sc<-bciciv2a`; mọi direction khác tiếp tục
+  dùng `F_rel`;
+- giữ nguyên minimum n=3, signal `|mean| > sample SD`, sign fraction `>=2/3`, và
+  yêu cầu ít nhất bốn signal/sign-consistent directions;
+- original failed summary được giữ immutable. Chỉ khi digest-bound v7 summary pass
+  mới mở replacement EWC/DER++.
+
+### Replacement PED scale v8 — 2026-08-18
+
+Khóa trước khi chạy XAI trên replacement checkpoints:
+
+- chỉ old-task BCI và High-Gamma được đo PED vì cả hai đã pass reliability và
+  fidelity; old-task Sleep bị loại vì fidelity fail;
+- dùng đúng validation split đã khóa: BCI `489/493`, High-Gamma `1966/1968`;
+- mỗi checkpoint tạo single-cell class-balanced margin-drop map cho fit/gate,
+  theo subject và group, trên cùng 110 cell;
+- primary noise-corrected PED cho mỗi subject là
+  `0,5[JSD(B_fit,A_gate)+JSD(B_gate,A_fit)] -
+   0,5[JSD(B_fit,B_gate)+JSD(A_fit,A_gate)]`;
+- không clip PED âm; cross-JSD và within-checkpoint noise được báo riêng;
+- scale mọi immediate transition hợp lệ trong 27 Sequential/EWC/DER++ run,
+  tổng cộng 63 transition cell. Không chạy lại fidelity per checkpoint và không
+  đọc test cho attribution; performance được ghép từ immutable test result đã có;
+- joint/offline alignment là bước riêng sau primary before/after PED, không chặn v8.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -428,15 +496,20 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Chốt pivot từ Fisher-overlap headline sang channel–frequency explanation drift.
 - [x] Khóa XAI config/operator/schema và viết synthetic/unit proof.
 - [x] Chạy BCI→Sleep attribution pilot ba seed và khóa transparent replication amendment.
-- [ ] Scale XAI qua checkpoint hiện có nếu và chỉ nếu pilot pass.
+- [x] Scale reliability-aware XAI qua replacement checkpoints sau High-Gamma gate pass.
 - [x] Chạy reliability amendment v2 trên BCI Before seed 42; full scale vẫn bị chặn.
 - [x] Chạy single-cell margin reliability trên PhysioNet Before-Sleep seed 42; gate fail và XAI scale dừng.
 - [x] Chạy Sleep sample-size amendment v3: một forward ở cap 200 trên Sleep-Before-PhysioNet seed 42, báo curve `48/121/237/451` row/subject/nửa từ cùng artifact.
 - [x] Chạy fidelity leg cho margin-drop: Sleep top `3/10` exhaustive `C(10,3)=120`, và BCI-Before seed 42.
 - [x] Đóng XAI: Sleep reliability pass nhưng exhaustive fidelity fail cả margin và BA.
-- [ ] Audit/download High-Gamma BIDS v1.0.2 và pass one-subject real-data contract.
-- [ ] Train single-task High-Gamma seed 42 và chạy reliability gate; chưa rerun CL.
-- [ ] Tổng hợp PED/performance alignment, hai figures và một table.
+- [x] Audit/download High-Gamma BIDS v1.0.2 và pass one-subject real-data contract.
+- [x] Train single-task High-Gamma seed 42 đúng 2.500 step; chưa rerun CL.
+- [x] Khóa attribution split và chạy High-Gamma reliability/fidelity gate trên final checkpoint; cả hai pass.
+- [x] Chạy High-Gamma replacement Sequential FT matrix 3 order × 3 seed và verify immutable artifacts.
+- [x] Pass replacement Sequential stability amendment v7; EWC/DER++ được phép mở.
+- [x] Hoàn tất replacement EWC/DER++ 3 order × 3 seed và digest-verified summaries.
+- [x] Tổng hợp noise-corrected PED/performance alignment trên 63 transition cell.
+- [ ] Hoàn thiện hai figures và một table.
 
 ### Completed execution history — 2026-08-14
 
@@ -532,6 +605,13 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-17: Final Sleep amendment outcome: margin reliability pass rất mạnh ngay cap 20/50/100/200 với median subject cosine `0,9707/0,9898/0,9924/0,9967` và 15/15 subject `>=0,50` ở mọi cap. Vì vậy sample size không phải blocker cho Sleep. BCI margin fidelity pass (`BA drop 0,2506 > p95 0,1211`; margin drop `1,9042 > p95 0,7249`). Sleep exhaustive top-3 fidelity fail cả BA (`0,2999 < p95 0,3651`) và margin (`1,4805 < p95 2,0358`), cho thấy individually stable ranking không tạo thành faithful multi-cell set. Theo locked conjunction gate, XAI đóng; không PED/method scale.
 - 2026-08-17: Sau dataset audit, cho phép một High-Gamma replacement gate thay vì nới metric trên PhysioNet. NEMAR manifest 33,6 GB chứa sourcedata+BIDS duplicate; chỉ tải BIDS cần thiết. Dataset selection, 22-channel montage, subject split và single-seed reliability gate được khóa trước download/model performance.
 - 2026-08-17: High-Gamma metadata audit xác nhận 14 subject, 480–1.057 event/subject cân bằng 4 class và đủ toàn bộ BCI-22 channels. Real BDF sub-1 test contract pass sau khi lazy loader được sửa để pick 22/128 channels trước preload: 160 trial, 40/class, finite `22x4x200` trong CBraMod units. Full suite vẫn `113 passed`; signal download tiếp tục checksum-resumable.
+- 2026-08-17: High-Gamma signal download hoàn tất 28/28 BDF và khớp source size. Source event audit phát hiện duy nhất `sub-2` train có class counts `202/204/204/203`; các run khác bằng nhau hoặc lệch tối đa một trial. Candidate protocol giữ toàn bộ published event, khóa `maximum_class_count_difference: 2` thay vì trim dữ liệu, và vẫn fail loud nếu thiếu class hoặc vượt ngưỡng quan sát này.
+- 2026-08-17: Candidate cache build hoàn tất sau class-count correction: 6.510 train sample/7 subject và 3.934 validation sample/4 subject, không materialize hoặc đọc test split. Single-task seed 42 chạy đủ 2.500 step; final mean subject BA `0,6391`, best validation `0,6576` tại step 1.400. Final checkpoint SHA-256 `19616935...32a52c`; reliability gate phải dùng exact-final checkpoint theo protocol, không dùng best checkpoint.
+- 2026-08-18: High-Gamma final candidate gate pass. Subject split-half cosine là `0,9838/0,9918/0,9928/0,9930`, median `0,9923`, group cosine `0,9857`; 4/4 subject vượt `0,50`. Conditional top-22 fidelity pass margin (`1,8010 > random p95 1,5944`) và BA (`0,25627 > random p95 0,25530`). BA margin chỉ hơn threshold khoảng `0,00097`, nên phải báo là pass sát và giữ full random distribution trong artifact. Result/config/individual/fidelity SHA-256 lần lượt là `a7298193...02637` / `32557787...4a125` / `91c1e849...0a4925` / `7e185fc6...24ac0`; test vẫn chưa được load trong gate.
+- 2026-08-18: Sau khi v5 immutable, High-Gamma test cache mới được materialize: 3.040 sample trên subject 12–14. Replacement Sequential FT hoàn tất 9/9. Mean directed `F_rel`: `BCI←High-Gamma -0,2548` (n=3), `BCI←Sleep 0,0670` (n=6), `High-Gamma←BCI 0,1563` (n=6), `High-Gamma←Sleep 0,1528` (n=6), `Sleep←High-Gamma 0,6321` (n=3), `Sleep←BCI 0,1129` nhưng chỉ n=2 hợp lệ. Seed-42 reverse có Sleep trước BCI `0,2482`, headroom `0,0482 < 0,05`, nên raw forgetting `-0,05125` được giữ nhưng `F_rel=null` đúng rule. Stability summary đạt 4 signal và 5 sign-consistent directions nhưng `enough_replicates=false`, do đó overall gate fail và EWC/DER++ chưa được mở. Không thay threshold hoặc âm thầm dùng raw F sau khi thấy outcome.
+- 2026-08-18: User-approved v7 summary pass mà không đổi v6 result: `Sleep←BCI` gate dùng raw F cho cả ba seed (mean `0,00058`, SD `0,04706`, không phải signal), năm direction khác giữ `F_rel`. Tổng cộng đủ replicate 6/6, signal 4/4 required và sign-consistent 6/4 required. Immutable v7 summary SHA-256 `bfd2bd9f...f6e23e`; EWC/DER++ được mở với hyperparameter cũ, không retune.
+- 2026-08-18: Replacement EWC và DER++ hoàn tất 18/18 run; mọi stage/checkpoint/prediction digest được summary verifier đọc lại. Mean directed `F_rel` theo thứ tự Sequential/EWC/DER++: `BCI←High-Gamma -0,2548/-0,1126/-0,0695`; `BCI←Sleep 0,0670/0,0642/-0,0532`; `High-Gamma←BCI 0,1563/-0,0091/0,0358`; `High-Gamma←Sleep 0,1528/0,0044/0,0029`; `Sleep←High-Gamma 0,6321/0,0188/0,0592`. `Sleep←BCI` là raw-fallback cho Sequential, còn EWC/DER++ `F_rel=-0,0005/0,0521`. EWC/DER++ giảm mạnh forgetting của High-Gamma và Sleep; inherited signal gate false (3/6 và 2/6 signal direction) vì forgetting bị suppress, không phải execution failure. Summary SHA-256 Sequential-v7/EWC/DER++ là `bfd2bd9f...f6e23e` / `1539ab85...2fc1e` / `98107895...4f28b`.
+- 2026-08-18: Replacement PED v8 hoàn tất 27/27 run, 63/63 immediate transition cell và 108 immutable map artifact. Mean subject-level noise-corrected PED theo Sequential/EWC/DER++: `BCI←High-Gamma 0,2431/0,0146/0,0516`; `BCI←Sleep 0,1400/0,0167/0,0687`; `High-Gamma←BCI 0,0825/0,00032/0,0333`; `High-Gamma←Sleep 0,1691/0,0097/0,0627`. EWC và DER++ giảm PED so với matched Sequential ở 21/21 cell; mean paired delta `-0,1369/-0,0922`. Performance–PED Spearman ở 21 cell/method là Sequential `-0,370`, EWC `0,088`, DER++ `-0,214` (exploratory, không significant), nên performance retention không phải proxy cho explanation retention. Summary SHA-256 `2005ef2c...7cc43`.
 
 ## Validation
 
@@ -569,6 +649,10 @@ Existing foundation proof completed on 2026-08-13/14:
 - RQ2 BCI←Sleep scale preflight strict-loaded before/after checkpoints từ Sequential-forward-3407, EWC-challenging-42 và DER++-forward-2026, đồng thời verified parent config/summary/result/stage/checkpoint/cache/split digests. Full repository suite passed `99 passed` trước launch.
 - PhysioNet/Sleep attribution preflight strict-loaded sequential before/after và joint checkpoint, verified capped assignment SHA cùng validation/test-cache SHA, và full repository suite passed `102 passed` trước launch.
 - Reliability v2 preflight strict-loaded exact BCI-Before seed-42 checkpoint, verified frozen split/test-blind digests, passed synthetic continuous-margin/ridge recovery proof và full suite `106 passed`. Immutable result SHA-256 `946a7044...30d17bc`; margin-score artifact SHA-256 `171a0ac1...0fb35dc`.
+- High-Gamma source verification và cache build pass cho đủ 28 BDF: 6.510 train + 3.934 validation sample; test subjects 12–14 không được materialize. Sau class-count regression tests, full repository suite pass `115 passed`. Candidate seed-42 training hoàn tất 2.500/2.500 step và ghi immutable `best.pt`, `final.pt`, `result.json` với cache/config/checkpoint digests.
+- High-Gamma attribution preflight strict-loaded exact-final single-task checkpoint, verified 3.934 validation row, frozen 1.966/1.968 split và 110-cell registry; reliability/fidelity result pass và bind config/checkpoint/score artifacts bằng SHA-256. Full suite sau configurable task registry, replay registry và stability-amendment tests pass `120 passed`.
+- Replacement performance matrix hoàn tất 27/27 run: Sequential/EWC/DER++ cùng 3 order × 3 seed. Summary verifier rehashed toàn bộ stage JSON, checkpoint và prediction; EWC peak state giữ 25.766.400 byte, DER++ peak 8.381.067 byte/119 slot.
+- Replacement PED scale hoàn tất 27/27 XAI result và 108 map artifact; summary verifier rehashed mọi artifact, xác nhận đúng 63 transition cell và `test_was_loaded_for_xai=false`. Noise-corrected cross-minus-within JSD unit tests và full repository suite pass `122 passed`.
 
 ## Result
 
@@ -576,4 +660,4 @@ Foundation, full CL matrices và performance forgetting vẫn hợp lệ; Fisher
 
 Nguyên nhân fail đã được định lượng là trial/subject chứ không phải estimator: signal-to-noise `4,31` (BCI, ~490 row/subject) so với `1,49` (PhysioNet, 90 row/subject), và BCI cắt xuống ngân sách PhysioNet cũng chỉ còn `0,722/0,541`. PhysioNet không còn dữ liệu để lấy thêm, nhưng Sleep-EDF có median `2.386` epoch/subject nên ràng buộc này là tự đặt qua cap 20.
 
-Final Sleep exception đã hoàn tất và XAI hiện tại đóng. Người dùng đã phê duyệt một paper-plan exception mới chỉ để gate High-Gamma như candidate thay PhysioNet; chưa được rerun CL. Training/performance-forgetting artifacts cũ vẫn hợp lệ nhưng High-Gamma chỉ được nhận vào scope nếu one-seed single-task reliability gate pass.
+Final Sleep exception fail fidelity, nhưng High-Gamma replacement candidate đã pass reliability/fidelity và hoàn tất full performance + PED scale. Sequential có subject-mean PED lớn dù performance đôi khi tăng, rõ nhất `BCI←High-Gamma`: `F_rel=-0,255` nhưng PED `0,243`. EWC giảm PED xuống `0,0003–0,0167` theo direction và DER++ xuống `0,0333–0,0687`; cả hai thắng matched Sequential 21/21 cell. Tuy nhiên within-method performance–PED correlation yếu, nên finding chính là: CL method có thể đồng thời cải thiện performance và explanation retention ở aggregate, nhưng accuracy riêng lẻ vẫn không đủ để suy ra explanation stability. Còn lại là figures/table, joint offline alignment và manuscript.

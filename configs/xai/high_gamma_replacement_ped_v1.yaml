@@ -1,0 +1,73 @@
+schema_version: 1
+id: high_gamma_replacement_ped_v1
+status: locked_xai_scale
+seed: 20260818
+canonical_tasks: [bciciv2a, high_gamma, sleep_edf_sc]
+methods:
+  sequential_finetuning:
+    training_config: configs/training/sequential_ft_high_gamma_v1.yaml
+    training_config_sha256: 1be187a08bd3de8afeadda5b5ab74f272703c9b6a79898032aeb53ca32b8fded
+    summary: results/continual/sequential_ft_high_gamma_v1/summary-v2.json
+    summary_sha256: bfd2bd9f1371e3d555878df42bdd2caccee01b7f022a6c7575228f65fcf6e23e
+    result_root: results/continual/sequential_ft_high_gamma_v1
+  ewc:
+    training_config: configs/training/ewc_high_gamma_v1.yaml
+    training_config_sha256: 63e8491417d19bb838c0905ee6535400e34bece1bdb13ebe13aacad8c39904c9
+    summary: results/continual/ewc_high_gamma_v1/summary.json
+    summary_sha256: 1539ab859615215a5396e3fb4be347562ac4c8f8e746018f92e6bd201ce2fc1e
+    result_root: results/continual/ewc_high_gamma_v1
+  derpp:
+    training_config: configs/training/derpp_high_gamma_v1.yaml
+    training_config_sha256: 953f1d71cb76abf1ebf3e245cc14b6ad6ef210ddbacafe494b400e8350e7be71
+    summary: results/continual/derpp_high_gamma_v1/summary.json
+    summary_sha256: 98107895f2b11d9ea77ba543af30cccf689de518cda6f119abf9cb503e64f28b
+    result_root: results/continual/derpp_high_gamma_v1
+tasks:
+  bciciv2a:
+    status: enabled_passed_reliability_and_fidelity
+    validation_index: data/processed/v3/bciciv2a/validation/index.json
+    validation_index_sha256: 0dc313c58764d59598e1fc25aeb843bdffe3c839166b0adada7dcc810325b0ec
+    validation_subjects: [A06, A07]
+    split:
+      method: sha256_rank_within_subject_class_v1
+      seed: 20260815
+      fit_samples: 489
+      gate_samples: 493
+      assignment_sha256: db6875681e198d6374a9be404712cce80249eb783d6f1d0f1cb86c8d97244c48
+  high_gamma:
+    status: enabled_passed_reliability_and_fidelity
+    validation_index: data/processed/high_gamma_candidate_v1/high_gamma/validation/index.json
+    validation_index_sha256: 52632247aea5b55a8ef3214eb1046318cc54d703e5ac9b02bade2aa210e65fb2
+    validation_subjects: [sub-8, sub-9, sub-10, sub-11]
+    split:
+      method: sha256_rank_within_subject_class_v1
+      seed: 20260818
+      fit_samples: 1966
+      gate_samples: 1968
+      assignment_sha256: 52add2ae02588b2c68ca3e4b423099e379e9cb27ba762dbf38c11b447696449b
+  sleep_edf_sc:
+    status: excluded_failed_fidelity
+cell_registry:
+  channels: [FZ, FC3, FC1, FCZ, FC2, FC4, C5, C3, C1, CZ, C2, C4, C6, CP3, CP1, CPZ, CP2, CP4, P1, PZ, P2, POZ]
+  bands:
+    - {name: delta, low_hz: 0.5, high_hz: 4.0}
+    - {name: theta, low_hz: 4.0, high_hz: 8.0}
+    - {name: alpha, low_hz: 8.0, high_hz: 13.0}
+    - {name: beta, low_hz: 13.0, high_hz: 30.0}
+    - {name: gamma, low_hz: 30.0, high_hz: 40.0}
+  sampling_rate_hz: 200
+estimator:
+  map: single_cell_classification_margin_drop
+  aggregation: mean_within_class_then_equal_classes_then_equal_subjects
+  drift: symmetric_cross_checkpoint_jsd_minus_within_checkpoint_split_noise
+  clip_negative_ped: false
+evaluation: {batch_size: 16, mask_chunk_size: 4}
+scale:
+  old_tasks: [bciciv2a, high_gamma]
+  excluded_old_tasks: [sleep_edf_sc]
+  immediate_transitions_only: true
+  expected_run_cells: 27
+  expected_transition_cells: 63
+  test_access_for_xai: forbidden
+output: {root: results/xai/high_gamma_replacement_ped_v1, immutable: true}
+purpose: primary_replacement_performance_explanation_alignment_scale

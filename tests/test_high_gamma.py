@@ -3,7 +3,10 @@ from pathlib import Path
 import pytest
 
 from eeg_forgetting.data.contracts import DatasetProtocolError
-from eeg_forgetting.data.datasets.high_gamma import read_high_gamma_events
+from eeg_forgetting.data.datasets.high_gamma import (
+    read_high_gamma_events,
+    validate_high_gamma_class_counts,
+)
 from eeg_forgetting.training.pilot import PilotSettings
 
 
@@ -33,3 +36,22 @@ def test_high_gamma_events_reject_unknown_class(tmp_path: Path) -> None:
 
 def test_high_gamma_is_a_declared_pilot_shape() -> None:
     PilotSettings(dataset="high_gamma", depth=4).validate()
+
+
+def test_high_gamma_accepts_observed_two_trial_class_difference() -> None:
+    labels = [0] * 202 + [1] * 204 + [2] * 204 + [3] * 203
+    validate_high_gamma_class_counts(
+        labels,
+        maximum_difference=2,
+        source="sub-2-train",
+    )
+
+
+def test_high_gamma_rejects_class_difference_above_locked_limit() -> None:
+    labels = [0] * 201 + [1] * 204 + [2] * 204 + [3] * 203
+    with pytest.raises(DatasetProtocolError, match="unbalanced class counts"):
+        validate_high_gamma_class_counts(
+            labels,
+            maximum_difference=2,
+            source="synthetic",
+        )
