@@ -65,3 +65,14 @@ def test_joint_schedule_is_task_balanced_and_canonical() -> None:
         "physionet_mi": 3,
         "sleep_edf_sc": 3,
     }
+
+
+def test_joint_schedule_accepts_replacement_task_registry() -> None:
+    tasks = ("bciciv2a", "high_gamma", "sleep_edf_sc")
+    schedule = joint_task_schedule(2, tasks)
+    assert schedule == tasks * 2
+    assert {task: schedule.count(task) for task in tasks} == {
+        "bciciv2a": 2,
+        "high_gamma": 2,
+        "sleep_edf_sc": 2,
+    }

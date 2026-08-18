@@ -372,6 +372,33 @@ Khóa trước khi chạy XAI trên replacement checkpoints:
   đọc test cho attribution; performance được ghép từ immutable test result đã có;
 - joint/offline alignment là bước riêng sau primary before/after PED, không chặn v8.
 
+### Joint offline-alignment hypothesis gate v9 — 2026-08-18
+
+Người dùng phê duyệt một bounded joint hypothesis test; manuscript hiện tại giữ
+nguyên cho tới khi gate pass. Joint mới là task-balanced offline reference, không
+phải explanation lý tưởng hay ground truth.
+
+- task set `[bciciv2a, high_gamma, sleep_edf_sc]`, seeds `3407/42/2026`;
+- giữ nguyên 2.500 update/task, canonical round-robin, optimizer/LR/depth của
+  `joint_v1`; không retune;
+- mixed `cache_roots` giống replacement CL configs;
+- chỉ score joint explanation cho BCI và High-Gamma trên frozen validation
+  fit/gate; Sleep tiếp tục bị loại;
+- strict all-six gate: BCI/High-Gamma × 3 seed đều phải pass reliability
+  (finite, median subject cosine `>=0,70`, `>=2/3` subject `>=0,50`) và held-out
+  fidelity về cả margin drop lẫn subject-balanced BA drop;
+- nếu một map fail, joint analysis dừng và không vào paper;
+- nếu pass, seed-matched alignment dùng cùng noise-corrected symmetric JSD:
+  `A_before=A(Before,Joint)`, `A_after=A(After,Joint)`,
+  `delta_A=A_after-A_before`; cross-seed variation chỉ là robustness, không phải
+  null;
+- hypothesis chỉ pass nếu EWC hoặc DER++ có paired mean `delta_A` thấp hơn
+  Sequential, 95% order-seed block-bootstrap CI không chứa 0, và thắng ít nhất
+  8/9 matched order-seed blocks;
+- nếu pass, paper chỉ được thêm tối đa một aggregate `delta_A` statistic/method
+  và 2–3 câu; direction/seed detail xuống supplementary. Nếu fail/null, bỏ joint
+  khỏi manuscript và không mở thêm experiment.
+
 Pilot duy nhất trước scale là direct `bciciv2a -> sleep_edf_sc`, seed `3407`:
 
 1. Tạo BCI reliance map tại exact BCI-only source checkpoint.
@@ -509,6 +536,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Pass replacement Sequential stability amendment v7; EWC/DER++ được phép mở.
 - [x] Hoàn tất replacement EWC/DER++ 3 order × 3 seed và digest-verified summaries.
 - [x] Tổng hợp noise-corrected PED/performance alignment trên 63 transition cell.
+- [ ] Parameterize joint mixed-task/cache roots và train `joint_high_gamma_v1` ba seed.
+- [ ] Gate sáu joint maps; chỉ nếu all-six pass mới tính `delta_A` trên 63 cells.
 - [x] Hoàn thiện hai figures và một table từ digest-bound replacement summary.
 - [x] Viết full ICASSP manuscript source với statistical reporting và limitations.
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -23,13 +23,16 @@ from .continual import (
     _atomic_torch_save,
     evaluate_task,
 )
-from .pilot import FixedStepBatchSampler, PilotSettings, set_determinism
+from .pilot import FixedStepBatchSampler, PilotSettings, TASK_CLASSES, set_determinism
 
 
-def joint_task_schedule(rounds: int) -> tuple[str, ...]:
-    if rounds <= 0:
+def joint_task_schedule(
+    rounds: int, tasks: Sequence[str] = CANONICAL_TASKS
+) -> tuple[str, ...]:
+    tasks = tuple(tasks)
+    if rounds <= 0 or not tasks or len(set(tasks)) != len(tasks):
         raise DatasetProtocolError("joint training needs positive task rounds")
-    return CANONICAL_TASKS * rounds
+    return tasks * rounds
 
 
 def run_joint_training(
@@ -46,15 +49,20 @@ def run_joint_training(
     config = load_yaml(config_path)
     if config.get("status") != "locked_main" or config.get("method") != "joint_training_upper_bound":
         raise DatasetProtocolError("joint config is not locked main authority")
-    if tuple(config["canonical_tasks"]) != CANONICAL_TASKS:
-        raise DatasetProtocolError("joint config changed canonical task order")
+    canonical_tasks = tuple(config["canonical_tasks"])
+    if (
+        not canonical_tasks
+        or len(set(canonical_tasks)) != len(canonical_tasks)
+        or not set(canonical_tasks).issubset(TASK_CLASSES)
+    ):
+        raise DatasetProtocolError("joint config has invalid canonical tasks")
     if int(seed) not in tuple(int(value) for value in config["seeds"]):
         raise DatasetProtocolError(f"joint seed {seed} is not declared")
     training = config["training"]
     rounds = int(training["optimizer_updates_per_task"])
-    if int(training["total_optimizer_updates"]) != rounds * len(CANONICAL_TASKS):
+    if int(training["total_optimizer_updates"]) != rounds * len(canonical_tasks):
         raise DatasetProtocolError("joint total updates do not match task-balanced rounds")
-    if tuple(training["task_order_within_round"]) != CANONICAL_TASKS:
+    if tuple(training["task_order_within_round"]) != canonical_tasks:
         raise DatasetProtocolError("joint task schedule is not canonical round-robin")
     output_dir = Path(output_dir)
     result_path = output_dir / "result.json"
@@ -65,13 +73,28 @@ def run_joint_training(
     device = torch.device(device)
     torch.cuda.set_device(device)
     cache_root = Path(cache_root)
+    configured_roots = config.get("cache_roots")
+    if configured_roots is None:
+        task_cache_roots = {task: cache_root for task in canonical_tasks}
+    else:
+        project_root = config_path.resolve().parents[2]
+        if set(configured_roots) != set(canonical_tasks):
+            raise DatasetProtocolError("joint cache roots must cover every canonical task")
+        task_cache_roots = {
+            task: (
+                Path(str(value)).resolve()
+                if Path(str(value)).is_absolute()
+                else (project_root / str(value)).resolve()
+            )
+            for task, value in configured_roots.items()
+        }
     train_sets = {
-        task: CachedEEGDataset(cache_root / task / "train" / "index.json")
-        for task in CANONICAL_TASKS
+        task: CachedEEGDataset(task_cache_roots[task] / task / "train" / "index.json")
+        for task in canonical_tasks
     }
     test_sets = {
-        task: CachedEEGDataset(cache_root / task / "test" / "index.json")
-        for task in CANONICAL_TASKS
+        task: CachedEEGDataset(task_cache_roots[task] / task / "test" / "index.json")
+        for task in canonical_tasks
     }
     test_loaders = {
         task: DataLoader(
@@ -86,7 +109,7 @@ def run_joint_training(
     backbone = load_pretrained_backbone(
         checkpoint_path, expected_sha256=checkpoint_sha256, map_location="cpu"
     )
-    model = MultiHeadCBraMod(backbone).to(device)
+    model = MultiHeadCBraMod(backbone, tasks=canonical_tasks).to(device)
     trainable = model.prepare_joint(
         depth=int(config["model"]["plastic_final_encoder_blocks"])
     )
@@ -129,11 +152,11 @@ def run_joint_training(
         )
 
     interval = int(training["progress_interval_rounds"])
-    recent = {task: deque(maxlen=interval) for task in CANONICAL_TASKS}
+    recent = {task: deque(maxlen=interval) for task in canonical_tasks}
     curve = []
     update = 0
     for round_number in range(1, rounds + 1):
-        for task in CANONICAL_TASKS:
+        for task in canonical_tasks:
             signals, labels, _subjects = next(loaders[task])
             signals = signals.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
@@ -156,7 +179,7 @@ def run_joint_training(
                 "round": round_number,
                 "optimizer_update": update,
                 "task_train_loss": {
-                    task: float(np.mean(recent[task])) for task in CANONICAL_TASKS
+                    task: float(np.mean(recent[task])) for task in canonical_tasks
                 },
             }
             curve.append(point)
@@ -164,7 +187,7 @@ def run_joint_training(
                 f"joint seed={seed} round={round_number}/{rounds} "
                 + " ".join(
                     f"{task}={point['task_train_loss'][task]:.5f}"
-                    for task in CANONICAL_TASKS
+                    for task in canonical_tasks
                 ),
                 flush=True,
             )
@@ -172,7 +195,7 @@ def run_joint_training(
     output_dir.mkdir(parents=True, exist_ok=True)
     evaluations = {}
     predictions = {}
-    for task in CANONICAL_TASKS:
+    for task in canonical_tasks:
         metrics, arrays = evaluate_task(model, task, test_loaders[task], device=device)
         prediction_path = output_dir / f"predictions-{task}.npz"
         _atomic_npz(prediction_path, arrays)

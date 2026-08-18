@@ -221,6 +221,16 @@ def test_high_gamma_replacement_candidate_is_locked_before_download() -> None:
     assert pilot["test_access"] == "forbidden"
 
 
+def test_joint_high_gamma_is_budget_matched_and_uses_mixed_cache_roots() -> None:
+    config = load_yaml(ROOT / "configs" / "training" / "joint_high_gamma_v1.yaml")
+    assert config["status"] == "locked_main"
+    assert config["canonical_tasks"] == ["bciciv2a", "high_gamma", "sleep_edf_sc"]
+    assert set(config["cache_roots"]) == set(config["canonical_tasks"])
+    assert config["training"]["optimizer_updates_per_task"] == 2500
+    assert config["training"]["total_optimizer_updates"] == 7500
+    assert config["training"]["task_order_within_round"] == config["canonical_tasks"]
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"
