@@ -78,26 +78,45 @@ def main() -> None:
     config = load_yaml(args.config)
     config_sha = sha256_file(args.config)
     output_root = _resolve(str(config["output"]["root"]))
-    gate_summary_path = output_root / "gate-summary.json"
+    gate_authority = config.get("gate_authority")
+    gate_result_root = (
+        _resolve(str(gate_authority["result_root"]))
+        if gate_authority is not None
+        else output_root
+    )
+    gate_summary_path = (
+        _resolve(str(gate_authority["summary"]))
+        if gate_authority is not None
+        else output_root / "gate-summary.json"
+    )
     with gate_summary_path.open(encoding="utf-8") as handle:
         gate_summary = json.load(handle)
     if (
-        gate_summary["config_sha256"] != config_sha
+        gate_summary["config_sha256"]
+        != (
+            str(gate_authority["config_sha256"])
+            if gate_authority is not None
+            else config_sha
+        )
         or gate_summary["strict_all_six_passed"] is not True
     ):
         raise DatasetProtocolError("strict joint gate did not pass")
     ped = config["ped_authority"]
     ped_config_path = _resolve(str(ped["config"]))
     ped_summary_path = _resolve(str(ped["summary"]))
-    if sha256_file(ped_config_path) != ped["config_sha256"] or sha256_file(ped_summary_path) != ped["summary_sha256"]:
+    if sha256_file(ped_config_path) != ped["config_sha256"]:
         raise DatasetProtocolError("PED authority digest mismatch")
     ped_config = load_yaml(ped_config_path)
     with ped_summary_path.open(encoding="utf-8") as handle:
         ped_summary = json.load(handle)
+    if ped_summary.get("config_sha256") != ped["config_sha256"]:
+        raise DatasetProtocolError("PED summary is not bound to its config")
+    if ped.get("summary_sha256") is not None and sha256_file(ped_summary_path) != ped["summary_sha256"]:
+        raise DatasetProtocolError("PED summary digest mismatch")
     joint_maps = {}
     for task in config["tasks"]:
         for seed in config["joint"]["seeds"]:
-            result_path = output_root / task / f"seed-{seed}" / "result.json"
+            result_path = gate_result_root / task / f"seed-{seed}" / "result.json"
             with result_path.open(encoding="utf-8") as handle:
                 result = json.load(handle)
             artifact = result["artifacts"]["map"]
@@ -205,6 +224,7 @@ def main() -> None:
     output = output_root / "alignment-summary.json"
     if output.exists():
         raise DatasetProtocolError(f"refusing to overwrite joint alignment {output}")
+    output_root.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".json.tmp")
     with temporary.open("x", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2, sort_keys=True)

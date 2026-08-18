@@ -1,0 +1,22 @@
+schema_version: 1
+id: joint_high_gamma_seedmatched_exploratory_v1
+status: exploratory_seedmatched_alignment
+joint: {seeds: [7, 123, 999]}
+tasks: {bciciv2a: {}, high_gamma: {}}
+gate_authority:
+  config: configs/xai/joint_high_gamma_exploratory_gate_v1.yaml
+  config_sha256: dd8a869e24a3bd31fdb9e0e2190b6b49dac2872f3a39393b9ab22a631c285f74
+  summary: results/xai/joint_high_gamma_exploratory_gate_v1/gate-summary.json
+  result_root: results/xai/joint_high_gamma_exploratory_gate_v1
+ped_authority:
+  config: configs/xai/high_gamma_replacement_ped_exploratory_v1.yaml
+  config_sha256: 008c8067e8c794e4403605e77adf102c976fc59f7447d0ab040db101e09e68cf
+  summary: results/xai/high_gamma_replacement_ped_exploratory_v1/summary.json
+alignment:
+  expected_transition_cells: 63
+  bootstrap_replicates: 20000
+  bootstrap_seed: 20260819
+  minimum_wins_out_of_9: 8
+  require_upper_ci_below_zero: true
+output: {root: results/xai/joint_high_gamma_seedmatched_exploratory_v1, immutable: true}
+purpose: posthoc_seedmatched_joint_alignment_report_only_cannot_override_official_paper

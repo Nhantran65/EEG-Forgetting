@@ -278,6 +278,17 @@ def test_exploratory_ped_scale_is_separate_and_test_blind() -> None:
     assert config["purpose"].endswith("cannot_override_official_paper")
 
 
+def test_seedmatched_exploratory_alignment_is_bounded_and_report_only() -> None:
+    config = load_yaml(
+        ROOT / "configs" / "xai" / "joint_high_gamma_seedmatched_exploratory_v1.yaml"
+    )
+    assert config["status"] == "exploratory_seedmatched_alignment"
+    assert config["joint"]["seeds"] == [7, 123, 999]
+    assert config["alignment"]["expected_transition_cells"] == 63
+    assert config["alignment"]["minimum_wins_out_of_9"] == 8
+    assert config["purpose"].endswith("cannot_override_official_paper")
+
+
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
     config = load_yaml(
         ROOT / "configs" / "xai" / "high_gamma_margin_reliability_v1.yaml"
