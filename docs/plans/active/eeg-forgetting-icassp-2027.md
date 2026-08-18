@@ -1,7 +1,7 @@
 # Execution Plan: Channel–Frequency Explanation Drift in Continual EEG Foundation Models
 
 Date: 2026-08-13
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
 ## Status
 
@@ -509,7 +509,8 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Pass replacement Sequential stability amendment v7; EWC/DER++ được phép mở.
 - [x] Hoàn tất replacement EWC/DER++ 3 order × 3 seed và digest-verified summaries.
 - [x] Tổng hợp noise-corrected PED/performance alignment trên 63 transition cell.
-- [ ] Hoàn thiện hai figures và một table.
+- [x] Hoàn thiện hai figures và một table từ digest-bound replacement summary.
+- [x] Viết full ICASSP manuscript source với statistical reporting và limitations.
 
 ### Completed execution history — 2026-08-14
 
@@ -535,7 +536,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - [x] Hoàn thành Week 2 CL matrix.
 - [ ] Hoàn thành XAI attribution pilot gate.
 - [ ] Hoàn thành full explanation-drift scale gate.
-- [ ] Hoàn thành Week 4 analysis/full draft gate.
+- [x] Hoàn thành Week 4 analysis/full draft gate; Tectonic PDF/page-count QA pass.
 - [ ] Hoàn thành submission package và validation.
 
 ## Decisions
@@ -612,6 +613,7 @@ Recovery is non-destructive: giữ mọi manifest, config, checkpoint và result
 - 2026-08-18: User-approved v7 summary pass mà không đổi v6 result: `Sleep←BCI` gate dùng raw F cho cả ba seed (mean `0,00058`, SD `0,04706`, không phải signal), năm direction khác giữ `F_rel`. Tổng cộng đủ replicate 6/6, signal 4/4 required và sign-consistent 6/4 required. Immutable v7 summary SHA-256 `bfd2bd9f...f6e23e`; EWC/DER++ được mở với hyperparameter cũ, không retune.
 - 2026-08-18: Replacement EWC và DER++ hoàn tất 18/18 run; mọi stage/checkpoint/prediction digest được summary verifier đọc lại. Mean directed `F_rel` theo thứ tự Sequential/EWC/DER++: `BCI←High-Gamma -0,2548/-0,1126/-0,0695`; `BCI←Sleep 0,0670/0,0642/-0,0532`; `High-Gamma←BCI 0,1563/-0,0091/0,0358`; `High-Gamma←Sleep 0,1528/0,0044/0,0029`; `Sleep←High-Gamma 0,6321/0,0188/0,0592`. `Sleep←BCI` là raw-fallback cho Sequential, còn EWC/DER++ `F_rel=-0,0005/0,0521`. EWC/DER++ giảm mạnh forgetting của High-Gamma và Sleep; inherited signal gate false (3/6 và 2/6 signal direction) vì forgetting bị suppress, không phải execution failure. Summary SHA-256 Sequential-v7/EWC/DER++ là `bfd2bd9f...f6e23e` / `1539ab85...2fc1e` / `98107895...4f28b`.
 - 2026-08-18: Replacement PED v8 hoàn tất 27/27 run, 63/63 immediate transition cell và 108 immutable map artifact. Mean subject-level noise-corrected PED theo Sequential/EWC/DER++: `BCI←High-Gamma 0,2431/0,0146/0,0516`; `BCI←Sleep 0,1400/0,0167/0,0687`; `High-Gamma←BCI 0,0825/0,00032/0,0333`; `High-Gamma←Sleep 0,1691/0,0097/0,0627`. EWC và DER++ giảm PED so với matched Sequential ở 21/21 cell; mean paired delta `-0,1369/-0,0922`. Performance–PED Spearman ở 21 cell/method là Sequential `-0,370`, EWC `0,088`, DER++ `-0,214` (exploratory, không significant), nên performance retention không phải proxy cho explanation retention. Summary SHA-256 `2005ef2c...7cc43`.
+- 2026-08-18: Paper artifacts khóa từ v8 summary: Figure 1 protocol + all-three-seed BCI reliance maps, Figure 2 63-cell performance/PED scatter + 21-cell paired deltas, và Table 1 direction-level `F_rel/PED`. Order–seed-blocked inference cho mean PED delta EWC `-0,1222` (95% bootstrap CI `[-0,1481,-0,0955]`) và DER++ `-0,0804` (`[-0,1032,-0,0581]`); cả hai 9/9 block giảm, two-sided sign-test `p=0,00390625`. Full LaTeX draft, bibliography, source notes và validation report nằm dưới `paper/`. Tectonic 0.16.9 + bundled IEEEtran compile pass thành 4 trang US Letter: trang 1--3 technical, trang 4 references-only; không overfull/undefined citation. Chỉ còn author metadata và final official-kit/PDF-eXpress compliance.
 
 ## Validation
 
@@ -653,6 +655,7 @@ Existing foundation proof completed on 2026-08-13/14:
 - High-Gamma attribution preflight strict-loaded exact-final single-task checkpoint, verified 3.934 validation row, frozen 1.966/1.968 split và 110-cell registry; reliability/fidelity result pass và bind config/checkpoint/score artifacts bằng SHA-256. Full suite sau configurable task registry, replay registry và stability-amendment tests pass `120 passed`.
 - Replacement performance matrix hoàn tất 27/27 run: Sequential/EWC/DER++ cùng 3 order × 3 seed. Summary verifier rehashed toàn bộ stage JSON, checkpoint và prediction; EWC peak state giữ 25.766.400 byte, DER++ peak 8.381.067 byte/119 slot.
 - Replacement PED scale hoàn tất 27/27 XAI result và 108 map artifact; summary verifier rehashed mọi artifact, xác nhận đúng 63 transition cell và `test_was_loaded_for_xai=false`. Noise-corrected cross-minus-within JSD unit tests và full repository suite pass `122 passed`.
+- Paper artifact builder tái tạo 2 figures ở PDF/SVG/PNG, Table 1 và deterministic 20.000-replicate clustered statistics. PNG final-aspect visual inspection pass; manuscript validator xác nhận đủ artifacts/citations, source summary SHA, 4 PDF pages và references-only final page, status `draft_ready_author_metadata_pending`. Full suite tiếp tục pass `122 passed`.
 
 ## Result
 

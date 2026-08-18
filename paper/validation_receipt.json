@@ -1,0 +1,26 @@
+{
+  "artifact_sha256": {
+    "paper/figures/figure1_protocol_maps.pdf": "7c532dc373d0a1140b3a64d185622f4843398daae3f86c80d07970a3f738ebea",
+    "paper/figures/figure1_protocol_maps.png": "d972a8ce1bf5a2f13de459007ee81ed6d5060e98dc91f50eb2898779d5d0d566",
+    "paper/figures/figure2a_performance_ped.pdf": "28b58cdc0ac12342b68421b9f2431be8112239dbebab2c7933b31143d23683c7",
+    "paper/figures/figure2a_performance_ped.png": "a5404effae7b9bd605c99be241def5635c08b45b391817d4d26c8de042479a59",
+    "paper/figures/figure2b_paired_ped.pdf": "0790af5991003e896cecec7cd501e721a89bc780882071874466ee3f1ac24998",
+    "paper/figures/figure2b_paired_ped.png": "275ecaa08cd7c1f40285a6d6370030aeb6beeb4839bcf6965d1e0a18e9ee94b8",
+    "paper/main.pdf": "db5184c28b96fa103286b0fbb5636a806da68a3972ce67f7de2a4bfef3c35735",
+    "paper/statistical_report.json": "3d4d51996faaabd871f149ec8c27c4cef6c31b2b15033e36ec1437a05b698ca5",
+    "paper/tables/table1_main.tex": "05f95450c0936c6b42020dc192eba9d2b7ef42b0c36a8fa3a096247c989695d5"
+  },
+  "author_placeholders": [
+    "\\IEEEauthorblockA{Affiliation and contact---replace before submission}}",
+    "\\author{\\IEEEauthorblockN{Author Name(s)---replace before submission}"
+  ],
+  "manuscript_word_count_approx": 1383,
+  "missing_artifacts": [],
+  "missing_citations": [],
+  "pdf_pages": 4,
+  "references_page_only": true,
+  "status": "draft_ready_author_metadata_pending",
+  "summary_digest_matches": true,
+  "tex_engines": [],
+  "unused_bibliography_keys": []
+}

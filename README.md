@@ -112,29 +112,3 @@ checkpoint used for Fisher and budget-matched comparisons. The one-off
 PhysioNet external reproduction is separate again: it uses the upstream
 64-channel preprocessing and 50-epoch full-backbone protocol through
 `scripts/run_physionet_cbramod_reproduction.py`.
-
-The Fisher instrument pilot extracts exact per-example diagonal empirical
-Fisher signatures from the step-2,500 checkpoints:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 uv run python scripts/run_fisher_instrument.py \
-  --dataset bciciv2a --device cuda:0
-uv run python scripts/summarize_fisher_instrument.py
-```
-
-It measures disjoint split-half stability before any signature is admitted to
-the continual-learning analysis. Raw signatures and checkpoints remain under
-the ignored `results/` tree; their config and source digests are recorded in
-each result document.
-
-The first sequential fine-tuning smoke uses exact 2,500-step exposure per task
-and evaluates every seen task on the frozen test split after each stage:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 uv run python scripts/run_sequential_ft_smoke.py \
-  --order forward --device cuda:0
-```
-
-Stage checkpoints make the run resumable at task boundaries. Per-example test
-predictions, subject metrics, raw forgetting and flagged (never clipped)
-relative forgetting are stored under `results/continual/`.

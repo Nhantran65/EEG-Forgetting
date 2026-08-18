@@ -14,6 +14,7 @@ wheels/
 /artifacts/
 /checkpoints/
 /results/
+/logs/
 
 # Harness core maintenance binary
 scripts/bin/harness

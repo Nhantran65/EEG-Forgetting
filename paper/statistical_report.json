@@ -1,0 +1,48 @@
+{
+  "association_note": "Spearman values are descriptive because transition cells share order, seed, and subjects.",
+  "associations": {
+    "derpp": {
+      "n_transition_cells": 21,
+      "pvalue_exploratory": 0.35094954850355253,
+      "spearman_rho": -0.21428571428571425
+    },
+    "ewc": {
+      "n_transition_cells": 21,
+      "pvalue_exploratory": 0.7034559950013928,
+      "spearman_rho": 0.08831168831168833
+    },
+    "sequential_finetuning": {
+      "n_transition_cells": 21,
+      "pvalue_exploratory": 0.0986265069357616,
+      "spearman_rho": -0.3701298701298701
+    }
+  },
+  "bootstrap_replicates": 20000,
+  "cluster_unit": "order_seed",
+  "methods": {
+    "derpp": {
+      "all_21_transition_cells_reduced": true,
+      "bootstrap_95_ci": [
+        -0.10323225392999245,
+        -0.05807304210651935
+      ],
+      "mean_block_ped_delta": -0.08039628215507413,
+      "median_block_ped_delta": -0.08877769000559277,
+      "n_order_seed_blocks": 9,
+      "negative_blocks": 9,
+      "two_sided_sign_test_p": 0.00390625
+    },
+    "ewc": {
+      "all_21_transition_cells_reduced": true,
+      "bootstrap_95_ci": [
+        -0.14805188213842788,
+        -0.09546156585311127
+      ],
+      "mean_block_ped_delta": -0.12222997655657197,
+      "median_block_ped_delta": -0.1259369677523003,
+      "n_order_seed_blocks": 9,
+      "negative_blocks": 9,
+      "two_sided_sign_test_p": 0.00390625
+    }
+  }
+}
