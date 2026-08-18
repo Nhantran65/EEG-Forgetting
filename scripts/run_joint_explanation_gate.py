@@ -94,7 +94,7 @@ def _fidelity(scores: dict[str, object], percentile: float) -> dict[str, object]
 def main() -> None:
     args = parse_args()
     config = load_yaml(args.config)
-    if config.get("status") != "locked_joint_alignment_gate":
+    if config.get("status") not in {"locked_joint_alignment_gate", "exploratory_joint_seed_audit"}:
         raise DatasetProtocolError("joint explanation gate config is not locked")
     if int(args.seed) not in config["joint"]["seeds"]:
         raise DatasetProtocolError("joint explanation seed is not declared")

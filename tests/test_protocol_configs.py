@@ -249,6 +249,10 @@ def test_exploratory_joint_seeds_cannot_override_formal_gate() -> None:
     assert config["canonical_tasks"] == ["bciciv2a", "high_gamma", "sleep_edf_sc"]
     assert config["training"]["optimizer_updates_per_task"] == 2500
     assert "cannot_override_formal_joint_gate" in config["purpose"]
+    gate = load_yaml(ROOT / "configs" / "xai" / "joint_high_gamma_exploratory_gate_v1.yaml")
+    assert gate["status"] == "exploratory_joint_seed_audit"
+    assert gate["joint"]["seeds"] == [7, 123, 999]
+    assert gate["purpose"].endswith("cannot_override_formal_joint_gate")
 
 
 def test_high_gamma_attribution_gate_is_locked_before_scoring() -> None:
