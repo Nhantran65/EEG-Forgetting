@@ -1,3 +1,5 @@
+f
+
 # 0002 Accept the Sequential Fine-Tuning Stability Gate
 
 Date: 2026-08-14
@@ -25,11 +27,11 @@ All nine immutable runs completed. All six directed transitions had enough
 replicates, passed the signal rule, and were sign-consistent. Mean relative
 forgetting by unordered pair was:
 
-| Pair | Fisher cosine | Mean relative forgetting | Sample SD | N |
-|---|---:|---:|---:|---:|
-| BCI IV-2a / PhysioNet-MI | 0.8277 | 0.0193 | 0.2079 | 9 |
-| BCI IV-2a / Sleep-EDF | 0.5672 | 0.3724 | 0.2800 | 9 |
-| PhysioNet-MI / Sleep-EDF | 0.5871 | 0.3262 | 0.1009 | 9 |
+| Pair                     | Fisher cosine | Mean relative forgetting | Sample SD | N |
+| ------------------------ | ------------: | -----------------------: | --------: | -: |
+| BCI IV-2a / PhysioNet-MI |        0.8277 |                   0.0193 |    0.2079 | 9 |
+| BCI IV-2a / Sleep-EDF    |        0.5672 |                   0.3724 |    0.2800 | 9 |
+| PhysioNet-MI / Sleep-EDF |        0.5871 |                   0.3262 |    0.1009 | 9 |
 
 The only consistently negative direction was BCI IV-2a after PhysioNet-MI
 (`mean F_rel=-0.2351`, three of three negative), indicating backward transfer
