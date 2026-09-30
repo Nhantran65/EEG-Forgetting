@@ -1,114 +1,181 @@
 # EEG Forgetting
 
-Reproducible data and experiment infrastructure for diagnosing catastrophic
-forgetting in CBraMod across heterogeneous EEG tasks.
+Code and review evidence for **REED-EEG**, a reliability-aware evaluation of
+channel–frequency explanation drift during continual EEG learning. The paper's
+replacement experiment trains CBraMod on BCI Competition IV-2a, High-Gamma
+(NEMAR `nm000172` v1.0.2), and Sleep-EDF Sleep Cassette. It compares sequential
+fine-tuning, EWC, and DER++ over three task orders and three seeds. The older
+BCI / PhysioNet-MI / Sleep-EDF experiment remains in the repository as an audit
+trail; PhysioNet-MI is not in the replacement paper matrix.
 
-The locked main datasets are BCI Competition IV-2a, PhysioNet-MI, and
-Sleep-EDF Expanded (Sleep Cassette). TUEV is the conditional fourth task once
-access and preprocessing are validated. The previous VEP candidate is
-quarantined from the main continual-learning matrix because its raw snapshot
-contains no stimulus markers and fails phase-crossover validation.
+## Check the paper numbers without downloading EEG data
 
-## Data contract
-
-Repository-owned protocol files live in `configs/datasets/`. All loaders emit
-EEG in CBraMod units and shape:
-
-```text
-(channels, one-second patches, 200 samples)
-```
-
-The shared amplitude convention is microvolts divided by 100. Dataset payloads,
-checkpoints, and results are intentionally ignored by Git. Paper-facing split
-manifests are versioned under `manifests/` and are create-only.
-
-## Development
+Install Python 3.12 and [uv](https://docs.astral.sh/uv/), then run:
 
 ```bash
-uv sync
-uv run pytest
+uv sync --locked
+uv run python paper/scripts/review_evidence.py
 ```
 
-Use `docs/plans/active/eeg-forgetting-icassp-2027.md` as the current execution
-plan and `docs/product/dataset-protocol.md` as the authoritative data contract.
+The checked-in [`paper/review_evidence.json`](paper/review_evidence.json) is a
+small derived bundle. It contains the three dataset gate rows, 63 immediate
+old-task transition cells, subject-level cross-checkpoint and within-checkpoint
+Jensen–Shannon divergences, and the aggregated BCI reliance maps used for the
+shift figure. It has no EEG samples, trial-level predictions, or model weights.
+Source paths and SHA-256 digests link its numbers to the full local artifacts.
 
-## Local raw data
+The verifier recomputes each subject's PED as cross-checkpoint divergence minus
+within-checkpoint split noise, then checks the subject means, direction-level
+mean and sample SD, the 21 matched PED differences per method, nine order–seed
+block means, the seeded 20,000-resample bootstrap intervals, exact sign tests,
+Spearman correlations, and the reliability/faithfulness routing decisions. It
+compares the inferential results with
+[`paper/statistical_report.json`](paper/statistical_report.json). If original
+source files happen to be present locally, it also checks their SHA-256 digests.
+This verifies the *reported calculations from exported intermediate values*;
+it does not independently rerun signal preprocessing, training, spectral
+occlusion, or the selection of the reported experiment.
 
-The public data downloader materializes only the source files needed by the
-locked protocol:
+The headline figures to check are: Sequential FT BCI←High-Gamma
+`F_rel = -0.255 ± 0.100`, `PED = 0.243 ± 0.067`; EWC and DER++ have lower PED
+in all 21 matched transition cells each. Their nine-block mean PED differences
+are `-0.1222` (95% bootstrap CI `[-0.1481, -0.0955]`) and `-0.0804`
+(`[-0.1032, -0.0581]`), respectively. Old-task Sleep is excluded from PED
+because its held-out faithfulness gate failed; it remains in training and
+performance evaluation. High-Gamma passes the balanced-accuracy fidelity
+threshold narrowly (25.63 versus 25.53 percentage points).
+
+To regenerate the bundle **when the original ignored results are available**:
+
+```bash
+uv run python paper/scripts/build_reliability_table.py
+uv run python paper/scripts/review_evidence.py --export
+```
+
+The export reads the digest-bound PED summary, the reliability table source
+report and the six BCI map files from `results/`. Review the resulting diff
+before committing an updated bundle. The four other scripts in `paper/scripts/`
+produce the expanded Table I, Table II, reliance-shift figure, and
+performance–PED figure from those same local artifacts.
+
+## Repository map
+
+- [`configs/datasets/`](configs/datasets/) defines datasets and subject splits;
+  [`configs/training/`](configs/training/) and [`configs/xai/`](configs/xai/)
+  lock training and explanation analysis.
+- [`src/eeg_forgetting/`](src/eeg_forgetting/) contains loaders, preprocessing,
+  the CBraMod adapter, continual-learning methods, metrics, and XAI operators.
+- [`scripts/`](scripts/) runs audits, cache creation, training, and summaries;
+  [`tests/`](tests/) covers protocol and calculation rules.
+- [`paper/`](paper/) contains the manuscript source, figures, statistics, and
+  compact review evidence. [`paper/source_notes.md`](paper/source_notes.md)
+  records the original PED summary digest.
+- [`docs/plans/active/eeg-forgetting-icassp-2027.md`](docs/plans/active/eeg-forgetting-icassp-2027.md)
+  records the dataset replacement, gates, amendments, and experiment outcomes.
+  [`docs/product/dataset-protocol.md`](docs/product/dataset-protocol.md)
+  documents the original data contract.
+
+**Manuscript identity:** `paper/main.tex` and `paper/main.pdf` are the tracked
+four-page draft. The separately supplied `Forgetting_Paper.pdf`, if present in
+a working tree, is a five-page manuscript variant and is not generated by
+`paper/main.tex`. The numerical review bundle covers their shared dataset-gate and main-result
+values and matched PED statistics; table numbering and layout differ between
+the PDFs, which must be reviewed as distinct versions.
+
+## Reproduce from original signals
+
+Requirements: Python 3.12, uv, an NVIDIA GPU for model runs, enough disk space
+for the EEG source files and derived caches, and access to the public datasets.
+`uv.lock` pins the Python dependencies; `configs/models/cbramod.yaml` pins the
+official upstream CBraMod code revision and pretrained checkpoint SHA-256.
+The model downloader verifies that checkpoint:
+
+```bash
+uv sync --locked
+uv run pytest
+uv run python scripts/download_cbramod_checkpoint.py
+CUDA_VISIBLE_DEVICES=0 uv run python scripts/smoke_test_cbramod_gpu.py
+```
+
+All loaders output `(channels, one-second patches, 200 samples)` in microvolts
+divided by 100. The active BCI/Sleep split manifests are in `manifests/v3/`.
+The repository downloader currently covers **BCI IV-2a, PhysioNet-MI, and
+Sleep-EDF**, but **not High-Gamma**:
 
 ```bash
 uv run python scripts/download_public_datasets.py --workers 16
 uv run python scripts/audit_downloaded_data.py
 uv run python scripts/audit_manifests.py --verify-sources
-uv run python scripts/smoke_test_real_preprocessing.py
-```
-
-Raw files live under `data/raw/` and are ignored by Git. The current audited
-snapshot contains 18 BCI IV-2a GDF files plus labels, 654 PhysioNet imagery EDF
-files, and 153 paired Sleep Cassette recordings.
-
-The active frozen split manifests are in `manifests/v3/`. They also freeze the
-channel registry and shared preprocessing config used by the manifest-backed
-loader. To materialize a later version from a new audited snapshot, pass an
-explicit new output directory to `scripts/build_manifests.py`; the builder
-refuses to overwrite an existing set.
-
-The training cache is derived only through that manifest-backed boundary and
-is resumable per recording/session:
-
-```bash
 uv run python scripts/build_processed_cache.py \
-  --datasets bciciv2a physionet_mi sleep_edf_sc \
-  --splits train validation --workers 8
+  --datasets bciciv2a sleep_edf_sc --splits train validation test --workers 8
 ```
 
-The audited v3 cache contains 2,678/982 BCI trials, 6,300/1,620 PhysioNet
-trials, and 118,662/39,580 Sleep epochs for train/validation respectively.
-
-## CBraMod integration
-
-The model adapter is pinned to official CBraMod code commit
-`b9e961003214326972c567eff390e75b0287e32a`. Download and verify the official
-checkpoint, then run the real-batch GPU proof:
+For High-Gamma, obtain the BIDS signal files and sidecars for NEMAR
+`nm000172` v1.0.2 under
+`data/raw/high_gamma/nm000172-v1.0.2/`. The local source manifest at that path
+is pinned to SHA-256
+`095d69f36b0818eb0df761065edb3fc4c51a4576ca16e0a030a2b0b1e4a2621f`
+by `configs/datasets/high_gamma.yaml`. That manifest and the source files are
+ignored by Git. The High-Gamma loader expects 28 BDF acquisitions with matching
+event sidecars; it checks source size and, when requested, SHA-256. Its subject
+split is train 1–7, validation 8–11, test 12–14. Once that exact source snapshot
+is present, create the paper cache with:
 
 ```bash
-uv run python scripts/download_cbramod_checkpoint.py
-CUDA_VISIBLE_DEVICES=0 uv run python scripts/smoke_test_cbramod_gpu.py
+uv run python scripts/build_high_gamma_candidate_cache.py \
+  --splits train validation test --verify-source-checksums
 ```
 
-The checkpoint lives under ignored `checkpoints/`; its revision, byte count and
-SHA-256 are locked in `configs/models/cbramod.yaml`. The current project lock
-uses the PyTorch CUDA 13.0 wheel. The smoke script requires an environment that
-exposes NVIDIA devices; unit tests remain CPU-compatible.
+The replacement protocol uses the 22 BCI-compatible channels, 0.5–40 Hz
+filtering, 200 Hz sampling and four-second High-Gamma windows. The locked
+settings are in `configs/datasets/high_gamma.yaml`,
+`configs/training/*_high_gamma_v1.yaml`, and
+`configs/xai/high_gamma_replacement_ped_v1.yaml`. Runs are create-only and
+bound by hashes to their input configs, cache indices, checkpoints and source
+results. The original matrix has 27 training runs (3 methods × 3 orders × 3
+seeds) and 27 XAI runs, yielding 63 eligible old-task transition cells.
 
-Pilot outputs are create-only under ignored `results/pilots/`. The fair frozen
-probe uses every channel-patch feature followed by one linear layer. The depth
-sweep uses the locked all-patch MLP head and keeps frozen CBraMod blocks in eval
-mode so their dropout cannot confound the number of plastic blocks:
+The main execution entry points, after the locked prerequisites and gate checks,
+are:
 
 ```bash
-uv run python scripts/run_cbramod_depth_pilot.py \
-  --dataset bciciv2a --depth 0 \
-  --config configs/pilots/cbramod_linear_probe.yaml \
-  --output-root results/pilots/cbramod_linear_probe_v1
-uv run python scripts/run_cbramod_depth_matrix.py --devices 0 1 2 3
-uv run python scripts/summarize_cbramod_depth_pilot.py
+uv run python scripts/run_high_gamma_candidate_training.py --device cuda:0
+uv run python scripts/run_margin_reliability.py \
+  --config configs/xai/high_gamma_margin_reliability_v1.yaml --device cuda:0
+uv run python scripts/run_sequential_ft_smoke.py \
+  --config configs/training/sequential_ft_high_gamma_v1.yaml \
+  --order forward --seed 3407 --device cuda:0
+uv run python scripts/run_continual_method_matrix.py \
+  --method ewc --config configs/training/ewc_high_gamma_v1.yaml \
+  --order forward --seed 3407 --device cuda:0
+uv run python scripts/run_continual_method_matrix.py \
+  --method derpp --config configs/training/derpp_high_gamma_v1.yaml \
+  --order forward --seed 3407 --device cuda:0
+uv run python scripts/run_replacement_ped_matrix.py \
+  --method sequential_finetuning --device cuda:0
+uv run python scripts/summarize_replacement_ped.py
 ```
 
-Depth v3 selected the final four encoder blocks by the predeclared 95% rule;
-the evidence and rejected pilot history are recorded in
-`docs/decisions/0001-lock-cbramod-head-and-depth.md`.
+The three orders are `forward`, `reverse`, and `challenging`; the main seeds are
+`3407`, `42`, and `2026`. Repeat training for each method/order/seed and PED for
+each method, following the stage and gate order in the active plan. EWC, DER++
+and PED configs pin upstream summary hashes, so later stages require the exact
+validated predecessor artifacts; the commands above are entry points rather
+than a clean-clone end-to-end recipe.
 
-Budget-matched single-task runs save two explicitly different artifacts:
+Full experiment reruns require the exact ignored source snapshot and the
+predeclared gate/checkpoint sequence recorded in the active plan. The current
+repository does **not** supply a High-Gamma download command or its pinned
+source manifest to a clean clone. Consequently, the compact verifier above is
+runnable from a clone, while an end-to-end rerun is not yet a one-command
+operation from a clone. Do not substitute a new manifest or retune a gate and
+call it the same experiment.
 
-```bash
-CUDA_VISIBLE_DEVICES=0 uv run python scripts/run_single_task_baseline.py \
-  --dataset bciciv2a --device cuda:0
-```
+## Storage policy
 
-`best.pt` is a validation diagnostic; `final.pt` is the exact step-2,500
-checkpoint used for Fisher and budget-matched comparisons. The one-off
-PhysioNet external reproduction is separate again: it uses the upstream
-64-channel preprocessing and 50-epoch full-backbone protocol through
-`scripts/run_physionet_cbramod_reproduction.py`.
+`data/`, `checkpoints/`, `results/`, and `logs/` are ignored and are not pushed.
+The tracked review bundle contains only compact derived numerical evidence and
+source hashes. Raw recordings and checkpoint licenses remain with their
+respective providers. The historical PhysioNet pipeline and pilots remain in
+code and documentation for provenance; they are separate from the
+High-Gamma replacement results reported above.
